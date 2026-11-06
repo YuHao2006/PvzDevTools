@@ -1,0 +1,15 @@
+/out/
+/dist/
+/vcpkg_installed/
+/.vs/
+/.idea/
+__pycache__/
+*.pyc
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.log
+*.tmp
+.env*

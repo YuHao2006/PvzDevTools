@@ -832,6 +832,10 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         Publish(generated / name, data);
     Publish(cache / "manifest.json", report.dump(2) + "\n");
     Publish(cache / "resources.stamp", "complete\n");
+    // Unlike generated sources, the stamp records successful execution even
+    // when its contents are unchanged. Otherwise newer compiler/input files
+    // keep the multi-output Ninja rule dirty on every subsequent build.
+    fs::last_write_time(cache / "resources.stamp", fs::file_time_type::clock::now());
     Json unproven = Json::array();
     for (unsigned i = 0; i < units.size(); ++i)
         if (!layouts[i]["exact"]["optimal"].get<bool>())

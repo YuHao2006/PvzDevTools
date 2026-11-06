@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$BuildDirectory,
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.1.1',
     [string]$ConverterExecutable,
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '../dist')
 )

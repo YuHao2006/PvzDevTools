@@ -1,5 +1,5 @@
 {
   "name": "pvz-dev-tools",
-  "version-string": "0.1.0",
+  "version-string": "0.1.1",
   "dependencies": ["zlib", "libspng", "libjpeg-turbo", "nlohmann-json"]
 }

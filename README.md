@@ -40,6 +40,8 @@ OR-Tools 的官方预编译包见 [官方 C++ 安装说明](https://developers.g
 
 图集不旋转，不缩放单图，保留两像素 RGBA 扩边。沿用配置中的每图集预算和最优要求：`FEASIBLE`／`UNKNOWN`、界和 gap 必须如实记录；只有经过证明的结果可以标为最优。保留更好布局、有效证明和未完成检查点；失败时不发布半成品资源包。图片 PNG 的编码字节可以不同，RGBA 像素必须保持无损一致。
 
+装箱的宽、高硬上限均为 **4096**，配置不能提高此上限。原版超过上限的字体长条不经过装箱求解，构建器会在字形边界折行并更新字体矩形；字形像素、字宽、字距和偏移保持一致，不在加载期缩图。旧缓存必须重新校验四千零九十六上限；来自更宽搜索域的合法最优解仍然最优，已耗尽预算的可行解仍只标为 FEASIBLE／UNKNOWN，并记录原搜索域与来源键。超限布局不能复用。
+
 可选重压缩输出独立的 `main-compact.pak64`，保留原包和源素材：
 
 ```powershell
@@ -52,7 +54,11 @@ OR-Tools 的官方预编译包见 [官方 C++ 安装说明](https://developers.g
 
 转换器同时附带于游戏的 Win7 发行包，因此 Windows 发布时用仍支持 Win7 的 MSVC 14.44 单独构建 `saveConverter/src`，并检查硬导入；用 `package-windows.ps1 -ConverterExecutable <旧工具链产物>` 指定这份程序。主机资源构建器和 OR-Tools 运行库不要求在 Win7 上运行。
 
-## 测试
+## 可视化存档修改器
+
+`saveEditor/` 提供 HTML 存档修改界面，使用 `node tools/build-save-editor.mjs` 生成单文件产物。支持 Toolkit 阵型码、六场景逐格布阵、叠层、撤销／重做、无尽参数，以及通过游戏宿主完成 DAT64 校验、导入、导出和完美进度部署。它不注入运行中的游戏。接口与独立使用范围见 [saveEditor/README.md](saveEditor/README.md)。
+
+## 测试与验证
 
 游戏资源与测试夹具不随本仓库重复分发。针对同级 `PlantsVsZombiesModern` 或通过 `PVZ_GAME_ROOT` 指定的游戏工程运行测试。当前 C++ 构建器与冻结 Python 实现对拍；Python 实现只保留为测试参照，不能作为生产构建回退路径。
 

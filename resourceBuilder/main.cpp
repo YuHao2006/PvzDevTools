@@ -8,13 +8,13 @@ int main(int argc, char **argv)
         using namespace pvz::build;
         if (argc == 2 && std::string_view(argv[1]) == "--version")
         {
-            std::cout << "PvzDevTools 0.1.1\n";
+            std::cout << "PvzDevTools 0.1.2\n";
             return 0;
         }
         if (argc < 2 || (argc == 2 && std::string_view(argv[1]) == "--help"))
         {
             std::cout
-                << "PvzDevTools resource builder 0.1.1\n"
+                << "PvzDevTools resource builder 0.1.2\n"
                    "build --root GAME --compiler REANIMC --cache DIRECTORY [--config FILE] [--generated-dir "
                    "DIRECTORY]\n"
                    "      [--compact lossless|light-lossy] [--compact-output FILE] [--compact-workers 1..8]\n"

@@ -224,7 +224,7 @@ Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, con
                        {"search_attempts", attempts},
                        {"search_microseconds", micros},
                        {"method", "native-maxrects"}};
-        Validate(batch, layout, 2, 16384);
+        Validate(batch, layout, 2, 4096);
         Require(!baseline || 1ULL * w * h <= baseline, "Native layout regresses shelf packing");
         result.push_back(layout);
     }
@@ -259,6 +259,44 @@ Json ExactLayout(const Json &sizes, const Json &native, const AtlasSettings &set
     }
     auto started = Clock::now();
     auto elapsed = [&] { return std::chrono::duration<double>(Clock::now() - started).count(); };
+    if (!fs::exists(path) && settings.maxSide < 16384)
+    {
+        // Restricting the feasible set preserves a proven optimum and valid
+        // lower bounds if the placement still fits. Completed bounded searches
+        // can also retain their spent budget and FEASIBLE/UNKNOWN status. Never
+        // promote an unproven result or imply it was searched in the new domain.
+        auto previousIdentity = identity;
+        previousIdentity["max_side"] = 16384;
+        const auto previousKey = Hash(Canonical(previousIdentity, true));
+        for (const auto &source : {directory, seed})
+        {
+            auto previous =
+                Cache(source / (previousKey + ".json"), previousKey, sizes, settings.padding, 16384);
+            if (previous.is_null())
+                continue;
+            const auto &proof = previous["exact"];
+            const bool bounded = !settings.requireOptimal && settings.seconds > 0 &&
+                                 proof.value("search_complete", false) &&
+                                 proof["solve_budget_seconds"].is_number() &&
+                                 proof["solve_budget_seconds"].get<double>() >= settings.seconds &&
+                                 Quality(previous) <= Quality(native);
+            if (!proof["optimal"].get<bool>() && !bounded)
+                continue;
+            try
+            {
+                Validate(sizes, previous, settings.padding, settings.maxSide);
+            }
+            catch (const std::exception &)
+            {
+                continue;
+            }
+            previous["exact"]["cache_key"] = key;
+            previous["exact"]["restricted_from_cache_key"] = previousKey;
+            previous["exact"]["search_domain_max_side"] = 16384;
+            Save(path, key, previous);
+            break;
+        }
+    }
     auto cached = Cache(path, key, sizes, settings.padding, settings.maxSide);
     auto initial = native;
     // All former solver revisions remain valid geometry hints. Only exact

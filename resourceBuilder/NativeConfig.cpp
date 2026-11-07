@@ -119,7 +119,7 @@ AtlasSettings Settings(AtlasSettings base, std::span<const std::string> args)
         else
             Require(false, "Unknown atlas setting " + key);
     }
-    Require(base.padding == 2 && base.maxSide >= 1 && base.maxSide <= 16384 && base.workers >= 1 &&
+    Require(base.padding == 2 && base.maxSide >= 1 && base.maxSide <= 4096 && base.workers >= 1 &&
                 base.workers <= 64,
             "Invalid atlas settings");
     Require(base.requireOptimal || base.seconds > 0, "Unproven layout requires a finite budget");

@@ -273,8 +273,9 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             virtualVariants[path] = {{"root", rootName}, {"variant", variant}};
         }
     auto corpus = LoadFonts(definitions / "fonts");
-    Insert(records, CompileFonts(corpus));
     auto rawFiles = Inventory(root);
+    Insert(records, PackFontImages(corpus, rawFiles));
+    Insert(records, CompileFonts(corpus));
     auto author = ReadJson(definitions / "resources.json");
     auto plan = CompileResources(root, author, corpus.tags);
     Json sceneInput = Json::array();

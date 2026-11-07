@@ -1,6 +1,7 @@
 #include "NativeBuild.h"
 #include <algorithm>
 #include <bit>
+#include <cstring>
 #include <regex>
 
 namespace pvz::build
@@ -507,6 +508,123 @@ FontCorpus LoadFonts(const fs::path &directory)
     }
     for (auto &tag : tags)
         result.tags[tag] = unsigned(result.tags.size());
+    return result;
+}
+
+Records PackFontImages(FontCorpus &corpus, const Files &files)
+{
+    // Original bitmap fonts are long horizontal strips, outside the atlas solver.
+    // Fold oversized strips at glyph boundaries without resampling any pixel or
+    // changing advances, offsets, kerning or layer metrics. Two copied neighbour
+    // columns preserve linear filtering at the ends of each folded strip.
+    constexpr unsigned limit = 4096, gutter = 2;
+    std::map<std::string, std::vector<Json *>> layers;
+    for (auto &font : corpus.fonts)
+        for (auto &layer : font["layers"])
+            layers[layer["image"].get<std::string>()].push_back(&layer);
+    Records result;
+    for (auto &[path, users] : layers)
+    {
+        // Small legacy GIF strips need no conversion. Their original bytes and
+        // glyph coordinates remain untouched; oversized authored strips use PNG.
+        const auto name = Lower(Key(path));
+        const auto masked =
+            (fs::path(name).parent_path() / ("_" + fs::path(name).filename().string())).generic_string();
+        bool gifStrip = false;
+        for (const auto &stem : {name, masked})
+            if (files.contains(stem + ".gif"))
+            {
+                const auto data = Read(files.at(stem + ".gif"));
+                Require(data.size() >= 10, "Truncated GIF font: " + path);
+                const unsigned w = unsigned(data[6]) | (unsigned(data[7]) << 8);
+                const unsigned h = unsigned(data[8]) | (unsigned(data[9]) << 8);
+                Require(w && h && w <= limit && h <= limit,
+                        "Oversized GIF font must be authored as lossless PNG: " + path);
+                gifStrip = true;
+            }
+        if (gifStrip)
+            continue;
+        ImageDescriptor descriptor;
+        descriptor.path = Lower(path);
+        descriptor.flags = 1024; // Font strips also support PopCap's automatic alpha image.
+        auto source = DecodeImage(descriptor, files);
+        if (source.width <= limit && source.height <= limit)
+            continue;
+        Require(source.height <= limit, "Font image is taller than 4096: " + path);
+        struct Slice
+        {
+            unsigned begin, end, sourceBegin, sourceEnd;
+        };
+        std::vector<Slice> slices;
+        unsigned begin = 0, width = 0;
+        while (begin < source.width)
+        {
+            const unsigned remaining = source.width - begin;
+            const unsigned strips = (remaining + limit - 2 * gutter - 1) / (limit - 2 * gutter);
+            unsigned end = begin + (remaining + strips - 1) / strips;
+            // A boundary must not bisect a glyph, including overlapping layers.
+            bool changed;
+            do
+            {
+                changed = false;
+                for (auto *layer : users)
+                    for (auto &[ch, glyph] : (*layer)["glyphs"].items())
+                    {
+                        const auto &r = glyph["rect"];
+                        const auto x = r[0].get<unsigned>(), w = r[2].get<unsigned>();
+                        if (x < end && x + w > end)
+                        {
+                            end = x;
+                            changed = true;
+                        }
+                    }
+            } while (changed);
+            Require(end > begin, "Font glyph cannot fit inside 4096: " + path);
+            const unsigned a = begin > gutter ? begin - gutter : 0;
+            const unsigned b = std::min(source.width, end + gutter);
+            slices.push_back({begin, end, a, b});
+            width = std::max(width, b - a);
+            begin = end;
+        }
+        const unsigned pitch = source.height + 2 * gutter;
+        const unsigned height = unsigned(slices.size()) * pitch;
+        Require(height <= limit, "Folded font image exceeds 4096: " + path);
+        Image packed;
+        packed.width = width;
+        packed.height = height;
+        packed.rgba.resize(std::size_t(width) * height * 4);
+        for (unsigned i = 0; i < slices.size(); ++i)
+        {
+            const auto &slice = slices[i];
+            for (unsigned y = 0; y < pitch; ++y)
+                std::memcpy(packed.rgba.data() + (std::size_t(i * pitch + y) * width) * 4,
+                            source.rgba.data() +
+                                (std::size_t(std::clamp(int(y) - int(gutter), 0, int(source.height) - 1)) *
+                                     source.width +
+                                 slice.sourceBegin) *
+                                    4,
+                            std::size_t(slice.sourceEnd - slice.sourceBegin) * 4);
+        }
+        const auto output = "compiled/fonts/images/" + Lower(fs::path(path).stem().string()) + ".png";
+        Require(!result.contains(output), "Duplicate packed font image: " + output);
+        result[output] = EncodePng(packed);
+        for (auto *layer : users)
+        {
+            (*layer)["image"] = output;
+            for (auto &[ch, glyph] : (*layer)["glyphs"].items())
+            {
+                auto &r = glyph["rect"];
+                const auto x = r[0].get<unsigned>();
+                for (unsigned i = 0; i < slices.size(); ++i)
+                    if (x >= slices[i].begin && (x < slices[i].end || i + 1 == slices.size()))
+                    {
+                        r[0] = x - slices[i].sourceBegin;
+                        r[1] = r[1].get<unsigned>() + i * pitch + gutter;
+                        break;
+                    }
+            }
+        }
+    }
     return result;
 }
 

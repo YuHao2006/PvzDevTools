@@ -59,10 +59,10 @@ def main():
                    '--seconds', 1, '--require-optimal', 'false']
         run('atlas', *command)
         layout = json.loads((temp / 'layout.json').read_text())
-        exact_atlas._validate([tuple(v) for v in sizes], layout, 2, 16384)
-        key = exact_atlas._cache_key(sizes, 2, 16384, exact_atlas._version())
+        exact_atlas._validate([tuple(v) for v in sizes], layout, 2, 4096)
+        key = exact_atlas._cache_key(sizes, 2, 4096, exact_atlas._version())
         cached = exact_atlas._read_cache(temp / 'solver/atlas-layout-cache' / (key + '.json'),
-                                        key, [tuple(v) for v in sizes], 2, 16384, exact_atlas._version())
+                                        key, [tuple(v) for v in sizes], 2, 4096, exact_atlas._version())
         assert cached is not None, 'Native proof cache is incompatible with validated Python cache'
         run('atlas', *command)
         assert json.loads((temp / 'layout.json').read_text())['exact']['cache_hit']

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$BuildDirectory,
-    [string]$Version = '0.1.1',
+    [string]$Version = '0.1.2',
     [string]$ConverterExecutable,
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '../dist')
 )
@@ -27,6 +27,10 @@ foreach ($library in Get-ChildItem -LiteralPath $buildRoot -Filter '*.dll' -File
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../LICENSE') -Destination $bundle
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../README.md') -Destination $bundle
+$editor = Join-Path $PSScriptRoot '../dist/web/save-editor.html'
+if (Test-Path -LiteralPath $editor) {
+    Copy-Item -LiteralPath $editor -Destination (Join-Path $bundle 'save-editor.html')
+}
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot '../third-party-notices')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../third-party-notices') -Destination $bundle -Recurse
 }

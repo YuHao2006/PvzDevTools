@@ -7,3 +7,5 @@
 转换器的三组 C++ 回归通过 `-DPVZ_TEST_FIXTURE_DIR=<游戏工程>/Tests` 启用，使用 CTest 执行。测试实现可以包含转换器的 `.cpp` 来访问内部解析器，不增加正式工具 API。
 
 `reference/python` 是迁移前算法的冻结参照，版权和原始文件 SHA 见 `SOURCE_ORIGIN.json`。它仅用于对拍，不会被生产构建器调用或进入 Windows 二进制发布包。`PVZ_GAME_ROOT` 指定资源和游戏测试夹具所在工程；默认使用同级 `PlantsVsZombiesModern`。
+
+`verify_texture_limits.py --package main.pak64 --reference <旧包>` 检查整包图片的 4096 上限，逐字形比较字体重排前后的像素、宽度、偏移和字距。它不要求新旧图集布局或 PNG 编码字节相同。

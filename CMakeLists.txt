@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(PvzDevTools VERSION 0.1.1 LANGUAGES CXX)
+project(PvzDevTools VERSION 0.1.2 LANGUAGES CXX)
 
 find_package(ZLIB REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)

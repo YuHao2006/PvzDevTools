@@ -63,7 +63,7 @@ Files Inventory(const fs::path &root);
 
 struct AtlasSettings
 {
-    unsigned padding = 2, maxSide = 16384, workers = 1;
+    unsigned padding = 2, maxSide = 4096, workers = 1;
     double seconds = 0;
     bool requireOptimal = true;
 };
@@ -116,6 +116,7 @@ std::map<std::string, ImageDescriptor> ImageDescriptors(const Json &author, cons
                                                         const std::set<std::string> &names);
 Image DecodeImage(const ImageDescriptor &descriptor, const Files &files);
 Bytes EncodePng(const Image &image);
+Records PackFontImages(FontCorpus &corpus, const Files &files);
 Image PackImages(const std::vector<const Image *> &images, const Json &layout);
 std::vector<std::size_t> ImageOffsets(std::string_view kind, std::span<const unsigned char> body);
 Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work);

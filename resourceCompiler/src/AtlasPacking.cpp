@@ -13,7 +13,7 @@
 
 namespace openpvz::reanim::atlas {
 namespace {
-constexpr unsigned Limit = 16384;
+constexpr unsigned Limit = 4096;
 struct Rect { unsigned x, y, w, h; };
 struct Layout {
     unsigned width = 0, height = 0;

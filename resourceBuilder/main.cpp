@@ -8,19 +8,20 @@ int main(int argc, char **argv)
         using namespace pvz::build;
         if (argc == 2 && std::string_view(argv[1]) == "--version")
         {
-            std::cout << "PvzDevTools 0.1.2\n";
+            std::cout << "PvzDevTools 0.1.3\n";
             return 0;
         }
         if (argc < 2 || (argc == 2 && std::string_view(argv[1]) == "--help"))
         {
             std::cout
-                << "PvzDevTools resource builder 0.1.2\n"
+                << "PvzDevTools resource builder 0.1.3\n"
                    "build --root GAME --compiler REANIMC --cache DIRECTORY [--config FILE] [--generated-dir "
                    "DIRECTORY]\n"
                    "      [--compact lossless|light-lossy] [--compact-output FILE] [--compact-workers 1..8]\n"
                    "config|fonts|resources --root GAME --output PATH\n"
                    "compact --input PAK64 --output PAK64 --mode lossless|light-lossy [--workers 1..8]\n"
                    "atlas --input SIZES_JSON --compiler REANIMC --output LAYOUT_JSON --cache DIRECTORY\n";
+            std::cout << "pack-atlas --input SPRITES_JSON --compiler REANIMC --output DIRECTORY --cache DIRECTORY\n";
             return argc < 2 ? 1 : 0;
         }
         Require(argc >= 2, "Expected build, config, fonts or resources subcommand");
@@ -35,6 +36,12 @@ int main(int argc, char **argv)
         {
             Compact(args.at("--input"), args.at("--output"), args.at("--mode"),
                     args.contains("--workers") ? std::stoul(args.at("--workers")) : 2);
+            return 0;
+        }
+        if (command == "pack-atlas")
+        {
+            PackAtlas(fs::canonical(args.at("--input")), fs::canonical(args.at("--compiler")),
+                      fs::absolute(args.at("--output")), fs::absolute(args.at("--cache")));
             return 0;
         }
         if (command == "atlas")

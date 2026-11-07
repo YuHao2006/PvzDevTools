@@ -44,6 +44,38 @@ OR-Tools 的官方预编译包见 [官方 C++ 安装说明](https://developers.g
 
 可选重压缩输出独立的 `main-compact.pak64`，保留原包和源素材：
 
+### 仅编译图集
+
+`pack-atlas` 从单素材清单独立输出 PNG、布局 JSON、UV 的 `.h` 声明和 `.cpp` 定义。
+它不会编译 reanim／particle 行为、字体或用户进度，也不会创建或更新 PAK。
+
+```powershell
+./pvz-resource-build.exe pack-atlas --input cards.json --compiler ./reanimc.exe `
+  --output out/cards --cache out/atlas-cache
+```
+
+```json
+{
+  "format": "pvz-sprite-atlas-v1",
+  "name": "LandscapeCards2x",
+  "time_limit_seconds": 60,
+  "require_optimal": false,
+  "sprites": [
+    { "name": "PEASHOOTER", "image": "approved/peashooter-2x.png", "logical_size": [81, 53] },
+    { "name": "SUNFLOWER", "image": "original-sheet.png", "rect": [81, 0, 81, 53] }
+  ]
+}
+```
+
+图片路径相对清单文件。`rect` 可从已有原生图集中无损拆图；不填写则使用整图。
+输入像素不缩放、不旋转，透明通道原样装箱；高分素材用 `logical_size` 指定独立的
+逻辑绘制尺寸。省略时沿用像素尺寸。枚举顺序与清单顺序一致；布局与 UV 重新生成，
+不能拿新 PNG 配旧 UV。图集宽、高依然不超过 4096，每张素材保持两像素 RGBA 扩边。
+
+所有输入校验和编码完成后才开始发布输出。该命令只处理显式清单，不自动采用待审 AI 素材。
+
+### 重压缩已有资源包
+
 ```powershell
 ./pvz-resource-build.exe compact --input main.pak64 --output main-compact.pak64 --mode lossless
 ```

@@ -122,6 +122,8 @@ std::vector<std::size_t> ImageOffsets(std::string_view kind, std::span<const uns
 Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work);
 Json ExactLayout(const Json &sizes, const Json &initial, const AtlasSettings &settings, const fs::path &cache,
                  const fs::path &seed);
+void PackAtlas(const fs::path &manifest, const fs::path &compiler, const fs::path &output,
+               const fs::path &cache);
 Json SceneParse(std::string_view text);
 Json CommonUI();
 Json PrepareScenes(Json documents, const Json &author, const Files &files,

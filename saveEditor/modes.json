@@ -1,0 +1,440 @@
+[
+  {
+    "id": 0,
+    "name": "冒险模式",
+    "symbol": "GAMEMODE_ADVENTURE",
+    "checkpoint": true
+  },
+  {
+    "id": 1,
+    "name": "宝石迷阵",
+    "symbol": "GAMEMODE_MINIGAME_BEGHOULED",
+    "checkpoint": true
+  },
+  {
+    "id": 2,
+    "name": "宝石迷阵转转看",
+    "symbol": "GAMEMODE_MINIGAME_BEGHOULED_TWIST",
+    "checkpoint": true
+  },
+  {
+    "id": 3,
+    "name": "雪橇区",
+    "symbol": "GAMEMODE_MINIGAME_BOBSLED_BONANZA",
+    "checkpoint": true
+  },
+  {
+    "id": 4,
+    "name": "植物列阵（柱子模式）",
+    "symbol": "GAMEMODE_MINIGAME_COLUMN",
+    "checkpoint": true
+  },
+  {
+    "id": 5,
+    "name": "僵王博士的复仇",
+    "symbol": "GAMEMODE_MINIGAME_FINAL_BOSS",
+    "checkpoint": true
+  },
+  {
+    "id": 6,
+    "name": "隐形食脑者",
+    "symbol": "GAMEMODE_MINIGAME_INVISIGHOUL",
+    "checkpoint": true
+  },
+  {
+    "id": 7,
+    "name": "坚不可摧",
+    "symbol": "GAMEMODE_MINIGAME_LAST_STAND",
+    "checkpoint": true
+  },
+  {
+    "id": 8,
+    "name": "小僵尸大麻烦",
+    "symbol": "GAMEMODE_MINIGAME_LITTLE_TROUBLE",
+    "checkpoint": true
+  },
+  {
+    "id": 9,
+    "name": "蹦蹦舞会",
+    "symbol": "GAMEMODE_MINIGAME_POGO_PARTY",
+    "checkpoint": true
+  },
+  {
+    "id": 10,
+    "name": "传送门之战",
+    "symbol": "GAMEMODE_MINIGAME_PORTAL_COMBAT",
+    "checkpoint": true
+  },
+  {
+    "id": 11,
+    "name": "种子雨",
+    "symbol": "GAMEMODE_MINIGAME_RAINING_SEEDS",
+    "checkpoint": true
+  },
+  {
+    "id": 12,
+    "name": "观星",
+    "symbol": "GAMEMODE_MINIGAME_SEEING_STARS",
+    "checkpoint": true
+  },
+  {
+    "id": 13,
+    "name": "老虎机",
+    "symbol": "GAMEMODE_MINIGAME_SLOT_MACHINE",
+    "checkpoint": true
+  },
+  {
+    "id": 14,
+    "name": "僵尸快跑",
+    "symbol": "GAMEMODE_MINIGAME_SPEED",
+    "checkpoint": true
+  },
+  {
+    "id": 15,
+    "name": "坚果保龄球",
+    "symbol": "GAMEMODE_MINIGAME_WALLNUT_BOWLING",
+    "checkpoint": true
+  },
+  {
+    "id": 16,
+    "name": "坚果保龄球 2",
+    "symbol": "GAMEMODE_MINIGAME_WALLNUT_BOWLING_2",
+    "checkpoint": true
+  },
+  {
+    "id": 17,
+    "name": "植物僵尸",
+    "symbol": "GAMEMODE_MINIGAME_WAR_AND_PEAS",
+    "checkpoint": true
+  },
+  {
+    "id": 18,
+    "name": "植物僵尸 2",
+    "symbol": "GAMEMODE_MINIGAME_WAR_AND_PEAS_2",
+    "checkpoint": true
+  },
+  {
+    "id": 19,
+    "name": "锤僵尸",
+    "symbol": "GAMEMODE_MINIGAME_WHACK_A_ZOMBIE",
+    "checkpoint": true
+  },
+  {
+    "id": 20,
+    "name": "僵尸水族馆",
+    "symbol": "GAMEMODE_MINIGAME_ZOMBIQUARIUM",
+    "checkpoint": true
+  },
+  {
+    "id": 21,
+    "name": "隐藏关 · Air Raid",
+    "symbol": "GAMEMODE_LIMBO_AIR_RAID",
+    "checkpoint": true
+  },
+  {
+    "id": 22,
+    "name": "隐藏关 · Art Challenge Sunflower",
+    "symbol": "GAMEMODE_LIMBO_ART_CHALLENGE_SUNFLOWER",
+    "checkpoint": true
+  },
+  {
+    "id": 23,
+    "name": "隐藏关 · Art Challenge Wallnut",
+    "symbol": "GAMEMODE_LIMBO_ART_CHALLENGE_WALLNUT",
+    "checkpoint": true
+  },
+  {
+    "id": 24,
+    "name": "隐藏关 · Big Time",
+    "symbol": "GAMEMODE_LIMBO_BIG_TIME",
+    "checkpoint": true
+  },
+  {
+    "id": 25,
+    "name": "隐藏关 · Bungee Blitz",
+    "symbol": "GAMEMODE_LIMBO_BUNGEE_BLITZ",
+    "checkpoint": true
+  },
+  {
+    "id": 26,
+    "name": "隐藏关 · Grave Danger",
+    "symbol": "GAMEMODE_LIMBO_GRAVE_DANGER",
+    "checkpoint": true
+  },
+  {
+    "id": 27,
+    "name": "隐藏关 · High Gravity",
+    "symbol": "GAMEMODE_LIMBO_HIGH_GRAVITY",
+    "checkpoint": true
+  },
+  {
+    "id": 28,
+    "name": "隐藏关 · Ice",
+    "symbol": "GAMEMODE_LIMBO_ICE",
+    "checkpoint": true
+  },
+  {
+    "id": 29,
+    "name": "隐藏关 · Resodded",
+    "symbol": "GAMEMODE_LIMBO_RESODDED",
+    "checkpoint": true
+  },
+  {
+    "id": 30,
+    "name": "隐藏关 · Shovel",
+    "symbol": "GAMEMODE_LIMBO_SHOVEL",
+    "checkpoint": true
+  },
+  {
+    "id": 31,
+    "name": "隐藏关 · Squirrel",
+    "symbol": "GAMEMODE_LIMBO_SQUIRREL",
+    "checkpoint": true
+  },
+  {
+    "id": 32,
+    "name": "隐藏关 · Stormy Night",
+    "symbol": "GAMEMODE_LIMBO_STORMY_NIGHT",
+    "checkpoint": true
+  },
+  {
+    "id": 33,
+    "name": "隐藏关 · Sunny Day",
+    "symbol": "GAMEMODE_LIMBO_SUNNY_DAY",
+    "checkpoint": true
+  },
+  {
+    "id": 34,
+    "name": "禅境花园",
+    "symbol": "GAMEMODE_LIMBO_ZEN_GARDEN",
+    "checkpoint": false
+  },
+  {
+    "id": 35,
+    "name": "开场演示",
+    "symbol": "GAMEMODE_INTRO",
+    "checkpoint": false
+  },
+  {
+    "id": 36,
+    "name": "我是僵尸 1",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_1",
+    "checkpoint": true
+  },
+  {
+    "id": 37,
+    "name": "我是僵尸 2",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_2",
+    "checkpoint": true
+  },
+  {
+    "id": 38,
+    "name": "我是僵尸 3",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_3",
+    "checkpoint": true
+  },
+  {
+    "id": 39,
+    "name": "我是僵尸 4",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_4",
+    "checkpoint": true
+  },
+  {
+    "id": 40,
+    "name": "我是僵尸 5",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_5",
+    "checkpoint": true
+  },
+  {
+    "id": 41,
+    "name": "我是僵尸 6",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_6",
+    "checkpoint": true
+  },
+  {
+    "id": 42,
+    "name": "我是僵尸 7",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_7",
+    "checkpoint": true
+  },
+  {
+    "id": 43,
+    "name": "我是僵尸 8",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_8",
+    "checkpoint": true
+  },
+  {
+    "id": 44,
+    "name": "我是僵尸 9",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_9",
+    "checkpoint": true
+  },
+  {
+    "id": 45,
+    "name": "我是僵尸无尽",
+    "symbol": "GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS",
+    "checkpoint": true
+  },
+  {
+    "id": 46,
+    "name": "砸罐子 1",
+    "symbol": "GAMEMODE_SCARY_POTTER_1",
+    "checkpoint": true
+  },
+  {
+    "id": 47,
+    "name": "砸罐子 2",
+    "symbol": "GAMEMODE_SCARY_POTTER_2",
+    "checkpoint": true
+  },
+  {
+    "id": 48,
+    "name": "砸罐子 3",
+    "symbol": "GAMEMODE_SCARY_POTTER_3",
+    "checkpoint": true
+  },
+  {
+    "id": 49,
+    "name": "砸罐子 4",
+    "symbol": "GAMEMODE_SCARY_POTTER_4",
+    "checkpoint": true
+  },
+  {
+    "id": 50,
+    "name": "砸罐子 5",
+    "symbol": "GAMEMODE_SCARY_POTTER_5",
+    "checkpoint": true
+  },
+  {
+    "id": 51,
+    "name": "砸罐子 6",
+    "symbol": "GAMEMODE_SCARY_POTTER_6",
+    "checkpoint": true
+  },
+  {
+    "id": 52,
+    "name": "砸罐子 7",
+    "symbol": "GAMEMODE_SCARY_POTTER_7",
+    "checkpoint": true
+  },
+  {
+    "id": 53,
+    "name": "砸罐子 8",
+    "symbol": "GAMEMODE_SCARY_POTTER_8",
+    "checkpoint": true
+  },
+  {
+    "id": 54,
+    "name": "砸罐子 9",
+    "symbol": "GAMEMODE_SCARY_POTTER_9",
+    "checkpoint": true
+  },
+  {
+    "id": 55,
+    "name": "砸罐子无尽",
+    "symbol": "GAMEMODE_SCARY_POTTER_ENDLESS",
+    "checkpoint": true
+  },
+  {
+    "id": 56,
+    "name": "生存无尽 · 白天",
+    "symbol": "GAMEMODE_SURVIVAL_ENDLESS_STAGE_1",
+    "checkpoint": true
+  },
+  {
+    "id": 57,
+    "name": "生存无尽 · 黑夜",
+    "symbol": "GAMEMODE_SURVIVAL_ENDLESS_STAGE_2",
+    "checkpoint": true
+  },
+  {
+    "id": 58,
+    "name": "生存无尽 · 泳池",
+    "symbol": "GAMEMODE_SURVIVAL_ENDLESS_STAGE_3",
+    "checkpoint": true
+  },
+  {
+    "id": 59,
+    "name": "生存无尽 · 浓雾",
+    "symbol": "GAMEMODE_SURVIVAL_ENDLESS_STAGE_4",
+    "checkpoint": true
+  },
+  {
+    "id": 60,
+    "name": "生存无尽 · 屋顶",
+    "symbol": "GAMEMODE_SURVIVAL_ENDLESS_STAGE_5",
+    "checkpoint": true
+  },
+  {
+    "id": 61,
+    "name": "生存困难 · 白天",
+    "symbol": "GAMEMODE_SURVIVAL_HARD_STAGE_1",
+    "checkpoint": true
+  },
+  {
+    "id": 62,
+    "name": "生存困难 · 黑夜",
+    "symbol": "GAMEMODE_SURVIVAL_HARD_STAGE_2",
+    "checkpoint": true
+  },
+  {
+    "id": 63,
+    "name": "生存困难 · 泳池",
+    "symbol": "GAMEMODE_SURVIVAL_HARD_STAGE_3",
+    "checkpoint": true
+  },
+  {
+    "id": 64,
+    "name": "生存困难 · 浓雾",
+    "symbol": "GAMEMODE_SURVIVAL_HARD_STAGE_4",
+    "checkpoint": true
+  },
+  {
+    "id": 65,
+    "name": "生存困难 · 屋顶",
+    "symbol": "GAMEMODE_SURVIVAL_HARD_STAGE_5",
+    "checkpoint": true
+  },
+  {
+    "id": 66,
+    "name": "生存普通 · 白天",
+    "symbol": "GAMEMODE_SURVIVAL_NORMAL_STAGE_1",
+    "checkpoint": true
+  },
+  {
+    "id": 67,
+    "name": "生存普通 · 黑夜",
+    "symbol": "GAMEMODE_SURVIVAL_NORMAL_STAGE_2",
+    "checkpoint": true
+  },
+  {
+    "id": 68,
+    "name": "生存普通 · 泳池",
+    "symbol": "GAMEMODE_SURVIVAL_NORMAL_STAGE_3",
+    "checkpoint": true
+  },
+  {
+    "id": 69,
+    "name": "生存普通 · 浓雾",
+    "symbol": "GAMEMODE_SURVIVAL_NORMAL_STAGE_4",
+    "checkpoint": true
+  },
+  {
+    "id": 70,
+    "name": "生存普通 · 屋顶",
+    "symbol": "GAMEMODE_SURVIVAL_NORMAL_STAGE_5",
+    "checkpoint": true
+  },
+  {
+    "id": 71,
+    "name": "智慧树",
+    "symbol": "GAMEMODE_TREE_OF_WISDOM",
+    "checkpoint": false
+  },
+  {
+    "id": 72,
+    "name": "自定义关卡",
+    "symbol": "GAMEMODE_CUSTOM_LEVEL",
+    "checkpoint": true
+  }
+]

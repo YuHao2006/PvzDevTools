@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {LineupLibrary,normalizeLineupLibrary} from '../saveEditor/lineup-library.mjs';
+const defaults=[{name:'A',code:'ABCDEFGHIJKLMNOP'},{name:'B',code:'QRSTUVWXYZabcdef'}];
+const memory=values=>{const data=new Map(Object.entries(values));return {data,getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)}};
+const storage=memory({pvz_custom_lineups:JSON.stringify([{name:'C',code:'abcdefghijklmnop'}]),pvz_deleted_lineups:JSON.stringify([defaults[0].code])});
+let library=new LineupLibrary(storage,defaults);assert.equal(library.existed,true);assert.deepEqual(library.snapshot().lineups.map(p=>p.name),['B','C']);
+library.remove(defaults[1].code);library=new LineupLibrary(storage,defaults);assert.deepEqual(library.snapshot().lineups.map(p=>p.name),['C']);
+library.remove('abcdefghijklmnop');library=new LineupLibrary(storage,defaults);assert.deepEqual(library.snapshot(),{format:1,lineups:[]},'Deleted defaults must not reappear in an empty library');
+library.replace({format:1,lineups:[defaults[0],defaults[0]]});assert.equal(library.snapshot().lineups.length,1);assert.deepEqual(new LineupLibrary(storage,defaults).snapshot(),library.snapshot());
+assert.equal(Object.hasOwn(library.snapshot().lineups[0],'id'),false);
+assert.throws(()=>normalizeLineupLibrary({format:1,lineups:[{name:'Bad',code:'invalid'}]}));
+const before=storage.getItem(library.key);assert.throws(()=>library.replace({format:2,lineups:[]}));assert.equal(storage.getItem(library.key),before);
+const fresh=new LineupLibrary(memory({}),defaults);assert.equal(fresh.existed,false);assert.deepEqual(fresh.snapshot().lineups,defaults);
+console.log('JSON lineup library: legacy migration, code identity, deletion/empty persistence, duplicate normalization and invalid-input preservation passed');

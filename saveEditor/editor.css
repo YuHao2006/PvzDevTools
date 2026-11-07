@@ -3,3 +3,5 @@
 .records{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:14px 0}details{border:1px solid #435239;border-radius:8px;padding:12px;margin:12px 0}summary{cursor:pointer;font-weight:600}table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:8px;border-bottom:1px solid #435239;text-align:left}#mode-guide{overflow:auto}#user-purchases>label:has(input[type=checkbox]),#user-achievements>label{flex-direction:row;align-items:center}
 
 #user-unlocks label{flex-direction:row;align-items:center;gap:6px}#user-unlocks input,#user-achievements input{order:-1}
+
+#editor-confirm{width:min(520px,90vw);max-height:85vh;overflow:auto;background:#192316;color:#e9efdf;border:1px solid #a8c681;border-radius:12px;padding:24px}#editor-confirm::backdrop{background:#000b}#editor-confirm-message{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}

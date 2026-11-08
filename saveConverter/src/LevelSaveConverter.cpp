@@ -3820,7 +3820,17 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
     const auto original = document;
     std::vector<PlantAttackRepair> repairs;
     // These are frozen canonical record offsets, not offsets into native classes.
-    // Seed 47 = Cob Cannon, state 38 = FIRING, loop 3 = PLAY_ONCE_AND_HOLD.
+    // Only known shooters can recover this historical zero-timer failure.
+    // Do not reinterpret held growth, arming, sleep or instant-plant animations.
+    // Repair restores the completion timer; live gameplay performs normal cleanup.
+    const auto shooter = [](int seed) {
+        switch (seed) {
+        case 0: case 5: case 7: case 8: case 10: case 13: case 18: case 24:
+        case 26: case 28: case 29: case 32: case 34: case 39: case 40:
+        case 42: case 43: case 44: case 47: return true;
+        default: return false;
+        }
+    };
     std::size_t timeIndex = 0;
     VisitTimeRecords(document, [&](auto& bytes, Dat64TimeSchema::Fields fields) {
         for (const auto& field : fields) {
@@ -3832,16 +3842,21 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
                 for (std::size_t slotIndex = 0; slotIndex < plants.mSlots.size(); ++slotIndex) {
                     auto& plant = plants.mSlots[slotIndex];
                     if (&bytes != &plant.mCanonicalRecord || !(plant.mID & DATA_ARRAY_KEY_MASK) ||
-                        ReadI32At(bytes, 48) != 47 || ReadI32At(bytes, 72) != 38 || bytes.at(333)) continue;
-                    const auto animationID = ReadU32At(bytes, 160);
+                        !shooter(ReadI32At(bytes, 48)) ||
+                        (ReadI32At(bytes, 48) == 47 && ReadI32At(bytes, 72) != 38) || bytes.at(333)) continue;
+                    bool completed = false;
+                    const std::array<std::uint32_t,4> animationIDs{ReadU32At(bytes,160), ReadU32At(bytes,164),
+                        ReadU32At(bytes,168), ReadU32At(bytes,172)};
                     for (const auto& animations : document.mArrays) {
                         if (animations.mKind != RecordKind::Reanimation) continue;
                         for (const auto& animation : animations.mSlots) {
                             const auto& record = animation.mCanonicalRecord;
-                            if (animation.mID != animationID || !(animationID & DATA_ARRAY_KEY_MASK) ||
+                            if (completed || !(animation.mID & DATA_ARRAY_KEY_MASK) ||
+                                std::find(animationIDs.begin(),animationIDs.end(),animation.mID)==animationIDs.end() ||
                                 ReadI32At(record, 24) != 3 || ReadI32At(record, 104) <= 0 ||
                                 record.at(28) || animation.mV7State.size() < 16 ||
                                 ReadI32At(animation.mV7State, 12) != ReadI32At(record, 36) - 1) continue;
+                            completed = true;
                             repairs.push_back({static_cast<unsigned int>(slotIndex),
                                 ReadI32At(bytes, 36), ReadI32At(bytes, 52)});
                             // Re-enable normal completion, without replaying the shot.

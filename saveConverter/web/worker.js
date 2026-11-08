@@ -26,6 +26,14 @@ onmessage=async({data})=>{
   module.FS.writeFile('/input/'+data.name,new Uint8Array(data.bytes));
   if(data.request){
    const {op,mode}=data.request;
+   if(op==='dfu'){
+    const error=module.ccall('pvz_dfu_save','string',['string'],[data.name]);
+    if(error)throw Error(error);
+    const name=module.ccall('pvz_conversion_output_name','string',[],[]);
+    if(name){const bytes=module.FS.readFile('/output/'+name);postMessage({bytes},[bytes.buffer])}
+    else postMessage({unchanged:true});
+    return;
+   }
    if(!['extract','validate','repair-plant-attacks'].includes(op))throw Error('独立存档工具暂不支持此操作：'+op);
    const error=module.ccall('pvz_inspect_save','string',['string','number','number'],[data.name,mode,+(op==='repair-plant-attacks')]);
    if(error)throw Error(error);

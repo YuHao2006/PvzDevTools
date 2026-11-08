@@ -1,4 +1,8 @@
 #include "LevelSaveConverter.h"
+#ifdef _WIN32
+#include "DataFixerUpper.h"
+#include <array>
+#endif
 
 #include <exception>
 #include <algorithm>
@@ -45,13 +49,13 @@ void PrintErrorRed(const std::string& theMessage)
 void PrintUsage(const std::filesystem::path& theProgram)
 {
     std::cout
-        << "PvZ 1.2.0.1073 存档双向转换器 v4（关卡档 game*.dat + 玩家明细档 user*.dat）\n\n"
+        << "PvZ 1.2.0.1073 存档双向转换器 / DataFixerUpper v5.1（关卡档 game*.dat + 玩家明细档 user*.dat）\n\n"
         << "用法：\n  " << theProgram.filename().string()
         << "\n  " << theProgram.filename().string()
         << " <输入 game*.dat|game*.dat64|user*.dat|user*.dat64> [输出文件]\n\n"
         << "选项：--target legacy|dat64-v1|dat64-v2|dat64-v4|dat64-v5；--round-time nearest。\n"
-        << "关卡 .dat 默认生成 dat64 v4；DAT64 默认导出 .dat。\n"
-        << "dat64 v4 schema 10745；v3 系列开发存档不再支持。\n"
+        << "关卡 .dat 默认生成 dat64 v5.1；DAT64 默认导出 .dat。\n"
+        << "dat64 v4 schema 10745；v5.1 schema 10747；v3 系列开发存档不再支持。\n"
         << "导出旧格式要求时间精确可表示；只有明确指定 nearest 才允许舍入。\n\n"
         << "dat64 v4 保存基础粒子定义 ID、内部外观和浮点 BPM/速度；旧值导入时自动转换，"
            "导出旧格式时速度四舍五入。\n"
@@ -231,6 +235,17 @@ int RunDirectoryBatch(const std::filesystem::path& theDirectory)
 
 int main(int argc, char** argv)
 {
+#ifdef _WIN32
+    if (argc == 4 && std::string_view(argv[1]) == "--dfu")
+    {
+        std::array<char,2048> error{};
+        const auto status=pvz_dfu_process_v1(argv[2],argv[3],error.data(),error.size());
+        if(status<0){PrintErrorRed(error.data());return 1;}
+        std::cout << (status ? "DFU: upgraded/repaired copy written\n" : "DFU: already current and healthy; no output written\n");
+        return 0;
+    }
+#endif
+
     try
     {
         if (argc == 1)

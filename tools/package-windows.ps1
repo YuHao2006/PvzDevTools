@@ -14,6 +14,7 @@ $programs = @{
     'pvz-resource-build.exe' = (Join-Path $buildRoot 'pvz-resource-build.exe')
     'reanimc.exe' = (Join-Path $buildRoot 'resourceCompiler/src/reanimc.exe')
     'pvz_dat64_converter.exe' = (Join-Path $buildRoot 'saveConverter/src/pvz_dat64_converter.exe')
+    'pvz_dfu.dll' = (Join-Path $buildRoot 'saveConverter/src/pvz_dfu.dll')
     'pvz-save-repair.exe' = (Join-Path $buildRoot 'saveConverter/src/pvz-save-repair.exe')
 }
 foreach ($name in @($programs.Keys)) {

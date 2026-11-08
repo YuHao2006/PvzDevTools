@@ -7,7 +7,7 @@ const output=path.resolve(process.argv[2]||path.join(root,'dist/web/save-convert
 const build=path.join(root,'out/web-converter');
 await fs.mkdir(build,{recursive:true});
 const emcc=process.env.EMXX||(process.platform==='win32'?'C:/UserProgram/DevTools/emsdk/upstream/emscripten/em++.exe':'em++');
-const compiled=spawnSync(emcc,[path.join(root,'saveConverter/src/LevelSaveConverter.cpp'),path.join(root,'saveConverter/web/WebEntry.cpp'),
+const compiled=spawnSync(emcc,[path.join(root,'saveConverter/src/LevelSaveConverter.cpp'),path.join(root,'saveConverter/src/DataFixerUpper.cpp'),path.join(root,'saveConverter/web/WebEntry.cpp'),
  '-I'+path.join(root,'saveConverter/src'),'-I'+path.join(root,'saveConverter/contracts'),'-std=c++23','-sMEMORY64=0','-O3','-flto','-fexceptions',
  '-sDISABLE_EXCEPTION_CATCHING=0','-sMODULARIZE=1','-sEXPORT_NAME=createSaveConverter','-sENVIRONMENT=worker',
  '-sSINGLE_FILE=1','-sALLOW_MEMORY_GROWTH=1','-sINITIAL_MEMORY=16777216','-sMAXIMUM_MEMORY=536870912',

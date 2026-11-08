@@ -1,3 +1,5 @@
+#include "DataFixerUpper.h"
+#include <array>
 #include "LevelSaveConverter.h"
 #include <emscripten/emscripten.h>
 #include <filesystem>
@@ -105,5 +107,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* pvz_model_convert(int encode)
         if(encode) PvzDat64::EncodeV4Model("/input/document.model","/output/generated.dat64");
         else PvzDat64::DecodeV4Model("/input/document.dat64","/output/document.model");
     }catch(const std::exception& error){resultError=error.what();}
+    return resultError.c_str();
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE const char* pvz_dfu_save(const char* filename)
+{
+    resultName.clear(); resultError.clear(); resultMetadata.clear();
+    const std::filesystem::path name(filename);
+    if (name.empty() || name != name.filename()) { resultError="Invalid DFU filename"; return resultError.c_str(); }
+    const auto input=(std::filesystem::path("/input")/name).string();
+    const auto output=(std::filesystem::path("/output")/name).string();
+    std::array<char,2048> error{};
+    const auto status=pvz_dfu_process_v1(input.c_str(),output.c_str(),error.data(),error.size());
+    if(status<0)resultError=error.data();
+    else if(status>0)resultName=name.string();
     return resultError.c_str();
 }

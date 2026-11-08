@@ -16,7 +16,9 @@ extern "C" int pvz_dfu_process_v1(const char* input, const char* output,
             std::filesystem::exists(output))
             throw std::runtime_error("DFU output must be a new file distinct from input");
         const auto format = PvzDat64::DetectFormat(input);
-        if (format != PvzDat64::Format::Dat64V4 && format != PvzDat64::Format::Dat64V5)
+        // Current files never run historical repair heuristics.
+        if (format == PvzDat64::Format::Dat64V5) return 0;
+        if (format != PvzDat64::Format::Dat64V4)
             throw std::runtime_error("DFU accepts DAT64 v4/v5 only");
         const std::filesystem::path repaired = std::string(output) + ".repair.tmp";
         struct Cleanup {
@@ -26,15 +28,9 @@ extern "C" int pvz_dfu_process_v1(const char* input, const char* output,
         const auto fixes = PvzDat64::RepairPlantAttacks(input);
         const auto source = fixes.empty() ? std::filesystem::path(input) : repaired;
         if (!fixes.empty()) PvzDat64::RepairPlantAttacks(input, repaired);
-        if (format == PvzDat64::Format::Dat64V4)
-        {
-            PvzDat64::ConversionOptions options;
-            options.mTargetFormat = PvzDat64::Format::Dat64V5;
-            PvzDat64::ConvertFile(source, output, options);
-        }
-        else if (!fixes.empty())
-            std::filesystem::rename(repaired, output);
-        else return 0;
+        PvzDat64::ConversionOptions options;
+        options.mTargetFormat = PvzDat64::Format::Dat64V5;
+        PvzDat64::ConvertFile(source, output, options);
         return 1;
     }
     catch (const std::exception& failure)

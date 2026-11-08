@@ -16,7 +16,8 @@ new path distinct from input. Returns 1 when an upgraded/repaired output was
 written, 0 for a healthy current save, -1 with a bounded error message on failure.
 No C++ object or exception crosses the boundary.
 
-Accepted sources: DAT64 v4 and v5.1. Output: v5.1. Known shooter repairs require
+Current v5.1 inputs return unchanged without a repair scan. Only v4 inputs run
+upgrade and historical repair. Output: v5.1. Known shooter repairs require
 an inactive shooting timer and an associated held animation on its completed
 last frame; Cob Cannon must also be in its firing state. Growth/arming/instant
 plants are excluded. Only the identified timer is re-enabled, without changing

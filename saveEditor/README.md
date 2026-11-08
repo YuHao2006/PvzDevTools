@@ -6,11 +6,11 @@
 node tools/build-save-editor.mjs
 ```
 
-产物为 `dist/web/save-editor.html`。独立打开时可编辑 Toolkit 阵型码、逐格布阵、撤销／重做并导出 JSON；支持六种场景以及植物、底座、南瓜、咖啡豆、梯子的叠层。
+产物为 `dist/web/save-editor.html`。独立运行时可管理用户及 DAT64，并编辑 Toolkit 阵型码、逐格布阵、撤销／重做和导出 JSON；支持六种场景以及植物、底座、南瓜、咖啡豆、梯子的叠层。
 
-游戏网页在投币授权后，将这个产物嵌入同源的受限 `srcdoc` iframe。`pvz-save-editor-v1` 消息协议提供 `init`、`generate`、`extract`、`export`、`import`、`save-lineup`、`close` 操作。宿主检查消息来源、当前授权、游戏已经关闭及单任务状态；DAT64 的读取、校验和生成复用游戏自带的隔离 Wasm 存档工具。
+游戏网页在投币授权后，将这个产物嵌入同源的受限 `srcdoc` iframe。`pvz-save-editor-v1` 消息协议提供 `init`、`generate`、`extract`、`export`、`import`、`save-lineup`、`close` 操作。宿主检查消息来源、当前授权、游戏已经关闭及单任务状态；DAT64 的读取、校验和生成由 PvzDevTools 独立 wasm32 工具处理，宿主只交换文件字节。
 
-HTML 不直接接触正在运行的关卡对象，不更改共享游戏代码或存档格式。独立页面没有 DAT64 引擎时会明确提示从游戏入口打开。用户资料和阵型库可以通过宿主备份到云端，关卡 DAT64 只保存在本地；删除用户前需要确认；只删除该用户及所属关卡。
+HTML 不直接接触正在运行的关卡对象，不更改共享游戏代码或存档格式。独立页面使用自身的 IndexedDB 和工具 Worker，不依赖游戏入口。用户资料和阵型库可以通过宿主备份到云端，关卡 DAT64 只保存在本地；删除用户前需要确认；只删除该用户及所属关卡。
 
 阵型库使用 `{"format":1,"lineups":[{"name":"阵型名称","code":"Toolkit 阵型码"}]}` JSON，可独立导入／导出；不依赖 SQLite，不生成整数 ID。阵型码是条目标识，列表位置只决定显示顺序。删除当前条目后，画布保留为未保存草稿，不把它挂到相邻条目的名称上。完整空列表也会保存，重新打开不能重新注入已删除的默认阵型。旧 localStorage 列表及默认阵型隐藏记录在首次读取时迁移。
 
@@ -25,4 +25,8 @@ HTML 不直接接触正在运行的关卡对象，不更改共享游戏代码或
 
 阵型支持列表删除（含隐藏默认阵型）、自定义输出槽位文件名。冒险的关卡号保存在 DAT64 内；0 模式共用一个文件，不能用文件后缀代替关卡号。花园、开场与智慧树无单独战斗检查点。文件名对照的 limbo 折叠区还包括白天、黑夜、浓雾、屋顶四种隐藏无尽；泳池无尽仍在常规区。
 
-宿主协议增加 `add-user`、`edit-user`、`delete-user`、`delete-lineup`；移除 `perfect`。`generate` 同时传文件名、模式和冒险关卡，按目标模式构造，非无尽保留自己的初始化机制。冒险生成时同步目标用户的当前冒险关卡。对读取／生成 DAT64 的请求传入对应用户资料，所有操作均在游戏停止时执行。
+宿主协议增加 `add-user`、`edit-user`、`delete-user`、`delete-lineup`；移除 `perfect`。`generate` 传文件名、模式和布阵，按目标模式构造，非无尽保留自己的初始化机制。所有冒险关卡共用 `game<ID>_0.dat64`；生成器读取该用户的冒险进度决定关卡，不接受单独关卡号，也不修改用户进度。对读取／生成 DAT64 的请求传入对应用户资料，所有操作均在游戏停止时执行。
+
+## 独立运行
+
+运行 `node tools/build-web-save-tools.mjs`，通过本地 HTTP 服务打开 `dist/web/save-editor.html`。独立页面现在支持全部用户及 DAT64 操作，不再只提供阵型编辑。它的 IndexedDB 与游戏存档分离；从工具导出文件后，在游戏关闭时自行替换。格式转换可用同目录 `save-converter.html`。工具只构建 wasm32，不要求 Memory64、WebGL、WebGPU、音频或游戏资源。详见 `saveConverter/web/README.md`。

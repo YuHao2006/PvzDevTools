@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';import path from 'node:path';import {spawnSync} from 'node:child_process';import {createHash} from 'node:crypto';import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+for(const script of ['saveConverter/web/build.mjs','tools/build-save-editor.mjs']){const result=spawnSync(process.execPath,[path.join(root,script)],{cwd:root,stdio:'inherit'});if(result.status!==0)process.exit(result.status||1)}
+const names=['save-editor.html','save-converter.html','save-codec.js','lineup-library.js','save-standalone.js','save-lineups.js','save-tool-core.js','save-tool-client.js','save-tool-worker.js','save-model.js','save-prefab.js','save-generate.js'];
+const files={};for(const name of names){const b=await fs.readFile(path.join(root,'dist/web',name));files[name]={bytes:b.length,sha256:createHash('sha256').update(b).digest('hex')}}
+const git=args=>spawnSync('git',args,{cwd:root,encoding:'utf8'}).stdout.trim();
+const manifest={tool:'PvzDevTools independent save tools',version:'0.1.4',memory_model:'wasm32',source_commit:git(['rev-parse','HEAD']),source_dirty:!!git(['status','--porcelain','--','saveConverter','saveEditor','tools/build-web-save-tools.mjs','tools/build-save-editor.mjs']),development:false,source_url:'https://github.com/YuHao2006/PvzDevTools',files};
+await fs.writeFile(path.join(root,'dist/web/manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+await fs.writeFile(path.join(root,'dist/web/README.txt'),'PvzDevTools independent save tools (wasm32)\r\n\r\nRun a local HTTP server in this directory, then open /save-editor.html.\r\nExample: python -m http.server 18105 --bind 127.0.0.1\r\n\r\nsave-converter.html can also be opened directly for offline conversion.\r\nNo game, graphics API, audio, PAK or Memory64 is required.\r\nThe standalone editor stores files in its own IndexedDB database. Export files before replacing game saves while the game is closed.\r\n');
+console.log('Standalone wasm32 tools and source manifest built.');

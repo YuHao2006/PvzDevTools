@@ -18,3 +18,6 @@ await fs.mkdir(path.dirname(output),{recursive:true});await fs.writeFile(output,
 
 await fs.writeFile(path.join(path.dirname(output),'save-codec.js'),codec+'\n'+store.replace(/^import .*;\s*/m,'')+'\nexport const modes='+modes+';\n');
 await fs.writeFile(path.join(path.dirname(output),'lineup-library.js'),library);
+
+await fs.copyFile(path.join(source,'standalone.mjs'),path.join(path.dirname(output),'save-standalone.js'));
+await fs.copyFile(path.join(source,'lineup-codec.mjs'),path.join(path.dirname(output),'save-lineups.js'));

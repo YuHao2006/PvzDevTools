@@ -15,6 +15,8 @@
 
 ## 构建
 
+独立网页存档转换器的构建与支持范围见 [saveConverter/web/README.md](saveConverter/web/README.md)。它在浏览器 Worker 内转换，不启动游戏或加载资源包。
+
 需要 CMake 3.24+、Ninja、C++23 编译器；Windows 使用 MSVC x64。依赖为 zlib、libspng、libjpeg-turbo、nlohmann-json 和 **OR-Tools 9.15.6755**。固定求解器版本用于复用现有证明缓存；不同求解器版本不得冒用旧证明。
 
 从 VS x64 开发者终端构建。例如用 vcpkg 提供图像和 JSON 依赖，并通过 `CMAKE_PREFIX_PATH` 指向 OR-Tools C++ 发行包：
@@ -89,7 +91,7 @@ OR-Tools 的官方预编译包见 [官方 C++ 安装说明](https://developers.g
 
 ## 可视化存档修改器
 
-`saveEditor/` 提供 HTML 存档修改界面，使用 `node tools/build-save-editor.mjs` 生成单文件产物。支持 Toolkit 阵型码、六场景逐格布阵、叠层、撤销／重做、无尽参数，以及通过游戏宿主完成 DAT64 校验、导入、导出和完美进度部署。它不注入运行中的游戏。接口与独立使用范围见 [saveEditor/README.md](saveEditor/README.md)。
+`saveEditor/` 提供 HTML 存档修改界面，使用 `node tools/build-save-editor.mjs` 生成单文件产物。支持 Toolkit 阵型码、六场景逐格布阵、叠层、撤销／重做、无尽参数，以及独立 wasm32 工具完成 DAT64 生成、校验、转换、导入、导出和坏档修复。独立网页可直接管理本地用户资料；集成到游戏网页时，宿主只在游戏停止后交换文件字节，不启动隐藏游戏或借用游戏模块。接口与独立使用范围见 [saveEditor/README.md](saveEditor/README.md)。
 
 ## 测试与验证
 

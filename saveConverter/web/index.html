@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PvZ 存档格式转换</title>
+<style>
+:root{color-scheme:dark;font:17px/1.65 system-ui,sans-serif;background:#10180e;color:#e4edd9}*{box-sizing:border-box}body{margin:0;padding:28px 16px}main{max-width:780px;margin:auto;padding:28px;border:1px solid #526b3a;border-radius:16px;background:#1b2516}h1{margin:0 0 12px;font-size:28px}p{color:#bdc9b2}label{display:block;margin:20px 0 8px}input[type=file],select,button{font:inherit;padding:12px;border:1px solid #718b51;border-radius:8px;background:#10180e;color:inherit;width:100%}button{margin-top:24px;background:#b9d98a;color:#18230e;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:default}.check{display:flex;align-items:start;gap:10px}.check input{margin-top:8px}#status{white-space:pre-wrap;overflow-wrap:anywhere}#download[hidden]{display:none}#download{display:block;margin-top:16px;color:#cee79c}small{color:#b6c2ab}
+</style>
+<main><h1>PvZ 存档格式转换</h1>
+<p>在本机浏览器中转换关卡档和用户资料，不上传文件，不加载游戏资源。原文件保持不变，转换结果另行下载。</p>
+<label for="file">存档文件</label><input id="file" type="file" accept=".dat,.dat64">
+<small>支持 game&lt;用户ID&gt;_&lt;模式&gt;.dat／.dat64 和 user&lt;用户ID&gt;.dat／.dat64。关卡模式编号会自动转换。</small>
+<label for="target">目标格式</label><select id="target"><option value="4">pvz_perf DAT64 v4</option><option value="0">原版 1.2.0.1073 DAT</option></select>
+<label class="check"><input id="round" type="checkbox"><span>导出原版时，允许把纳秒时间舍入到原版的 10 毫秒单位。</span></label>
+<small>DAT64 v1～v3 不支持。v5 将在破坏性更新的字段格式定稿后加入，不把 v4 改头冒充 v5。</small>
+<button id="convert" disabled>转换并生成下载文件</button><p id="status" role="status" aria-live="polite">请选择存档文件。</p><a id="download" hidden>下载转换结果</a>
+</main>
+<script id="worker-source" type="text/plain">/* CONVERTER_CORE */</script>
+<script>
+(()=>{
+ const file=document.getElementById('file'),target=document.getElementById('target'),run=document.getElementById('convert'),status=document.getElementById('status'),download=document.getElementById('download');
+ let worker,url,busy=false;
+ file.onchange=()=>{run.disabled=!file.files.length||busy};
+ run.onclick=async()=>{
+  const input=file.files[0];if(!input||busy)return;
+  if(!/^(?:game\d+_\d+|user\d+)\.dat(?:64)?$/i.test(input.name)){status.textContent='请保留正确的 game用户ID_模式 或 user用户ID 文件名。users.dat 汇总表不使用此转换器。';return}
+  busy=true;run.disabled=true;download.hidden=true;if(url){URL.revokeObjectURL(url);url=null}status.textContent='正在转换…';
+  try{
+   const bytes=await input.arrayBuffer();
+   if(!worker){const source=URL.createObjectURL(new Blob([document.getElementById('worker-source').textContent],{type:'text/javascript'}));worker=new Worker(source);URL.revokeObjectURL(source)}
+   const result=await new Promise((resolve,reject)=>{
+    worker.onmessage=event=>event.data.error?reject(Error(event.data.error)):resolve(event.data);
+    worker.onerror=event=>{worker.terminate();worker=null;reject(Error(event.message||'转换线程运行失败'))};
+    worker.postMessage({name:input.name,bytes,target:Number(target.value),round:document.getElementById('round').checked,user:/^user\d+/i.test(input.name)},[bytes]);
+   });
+   url=URL.createObjectURL(new Blob([result.bytes],{type:'application/octet-stream'}));download.href=url;download.download=result.name;download.textContent='下载 '+result.name+'（'+result.bytes.length+' 字节）';download.hidden=false;status.textContent='转换成功，原文件未修改。';
+  }catch(error){status.textContent='转换失败：'+error.message}
+  finally{busy=false;run.disabled=!file.files.length}
+ };
+})();
+</script></html>

@@ -3,10 +3,11 @@
 const $=id=>document.getElementById(id);
 const plants=['豌豆射手','向日葵','樱桃炸弹','坚果','土豆雷','寒冰射手','大嘴花','双发射手','小喷菇','阳光菇','大喷菇','墓碑吞噬者','魅惑菇','胆小菇','寒冰菇','毁灭菇','睡莲','窝瓜','三线射手','缠绕海草','火爆辣椒','地刺','火炬树桩','高坚果','海蘑菇','路灯花','仙人掌','三叶草','裂荚射手','杨桃','南瓜头','磁力菇','卷心菜投手','花盆','玉米投手','咖啡豆','大蒜','叶子保护伞','金盏花','西瓜投手','机枪射手','双子向日葵','忧郁菇','香蒲','冰西瓜','吸金磁','地刺王','玉米加农炮'];
 let model={scene:2,rake:0,cells:Array(54).fill(0)},presets=[],custom=[],past=[],future=[],busy=false,eraser=false,host=false,initialized=false,sequence=0;
-let library;
+let library,standalone;
 const pending=new Map(),channel='pvz-save-editor-v1',origin=new URL(document.baseURI).origin;
 const rows=()=>model.scene===2||model.scene===3?6:5;
 function request(op,payload={}){
+ if(standalone)return standalone.request(op,payload);
  if(!host)return Promise.reject(Error('DAT64 操作需从 pvz_perf 的“自定义存档”入口打开；独立页面可编辑阵型码及布阵 JSON。'));
  const id=++sequence;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(Error('存档操作超时，请勿刷新；先确认本地存档状态。'))},240000);pending.set(id,{resolve,reject,timer});parent.postMessage({channel,id,op,payload},origin)});
 }
@@ -27,7 +28,7 @@ function confirmAction(message){
  dialog.returnValue='cancel';
  return new Promise(resolve=>{dialog.addEventListener('close',()=>{const confirmed=dialog.returnValue==='confirm';if(!confirmed)status('已取消操作。');resolve(confirmed)},{once:true});dialog.showModal()});
 }
-async function action(fn){if(busy)return;busy=true;const disabled=[...document.querySelectorAll('button,input,select,textarea')].map(el=>[el,el.disabled]);disabled.forEach(([el])=>el.disabled=true);try{status('处理中…');await fn()}catch(error){status(error.message||String(error),true)}finally{busy=false;disabled.forEach(([el,value])=>el.disabled=value);refreshProfileControls();refreshLineupControls()}}
+async function action(fn){if(busy)return;busy=true;const disabled=[...document.querySelectorAll('button,input,select,textarea')].map(el=>[el,el.disabled]);disabled.forEach(([el])=>el.disabled=true);try{status('处理中…');await fn()}catch(error){status(error.message||String(error),true)}finally{busy=false;disabled.forEach(([el,value])=>el.disabled=value);refreshProfileControls();refreshLineupControls();describeSlot()}}
 function tab(name){document.querySelectorAll('.tab').forEach(el=>el.hidden=el.id!==name);document.querySelectorAll('[data-tab]').forEach(el=>el.setAttribute('aria-selected',String(el.dataset.tab===name)))}
 document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>tab(el.dataset.tab));
 function refreshLineupControls(){$('delete-lineup').disabled=busy||![...presets,...custom].some(p=>p.code===$('preset').value)}
@@ -58,11 +59,16 @@ $('add-lineup').onclick=()=>action(async()=>{await updateCode();const entry={nam
 function recipe(){const flags=Number($('flags').value),seed=Number($('seed').value),sun=Number($('sun').value);if(!Number.isInteger(flags)||flags<0||flags>10000000||flags%2)throw Error('旗数需为 0～10000000 的偶数');if(!Number.isInteger(seed)||seed<-2147483648||seed>2147483647)throw Error('种子需为 32 位整数');if(!Number.isInteger(sun)||sun<0||sun>9990)throw Error('阳光需为 0～9990 的整数');return {...structuredClone(model),flags,seed,sun}}
 function download(data,name,type){const url=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}
 $('recipe').onclick=()=>action(async()=>{download(JSON.stringify(recipe(),null,2),'pvz-lineup.json','application/json');status('已导出布阵 JSON。')});
-$('generate').onclick=()=>action(async()=>{const name=$('generate-filename').value.trim(),result=await request('generate',{name,level:Number($('adventure-level').value),recipe:recipe()});fillSaves(result.saves);if(result.profiles)loadProfiles(result.profiles);status('已生成并部署 '+name+'。')});
-$('extract').onclick=()=>action(async()=>{const result=await request('extract',{name:$('save-list').value});checkpoint();setModel(result.metadata);$('sun').value=result.metadata.sun;$('flags').value=result.metadata.flags;$('seed').value=result.metadata.seed;$('generate-filename').value=$('save-list').value;$('adventure-level').value=result.metadata.level||1;describeSlot();await updateCode();tab('lineup');status('已提取阵型；修改后生成新档会恢复植物血量。')});
+$('generate').onclick=()=>action(async()=>{const name=$('generate-filename').value.trim(),result=await request('generate',{name,recipe:recipe()});fillSaves(result.saves);if(result.profiles)loadProfiles(result.profiles);status('已生成并部署 '+name+'。')});
+$('extract').onclick=()=>action(async()=>{const result=await request('extract',{name:$('save-list').value});checkpoint();setModel(result.metadata);$('sun').value=result.metadata.sun;$('flags').value=result.metadata.flags;$('seed').value=result.metadata.seed;$('generate-filename').value=$('save-list').value;describeSlot();await updateCode();tab('lineup');status('已提取阵型；修改后生成新档会恢复植物血量。')});
 $('export').onclick=()=>action(async()=>{const name=$('save-list').value,result=await request('export',{name});download(result.bytes,name,'application/octet-stream');status('已导出 '+name)});
 $('file').onchange=()=>{const file=$('file').files[0];if(/^game[1-9]\d*_\d+\.dat64$/.test(file?.name))$('filename').value=file.name};
 $('import').onclick=()=>action(async()=>{const file=$('file').files[0];if(!file)throw Error('请选择 DAT64');if(file.size>32*1024*1024)throw Error('DAT64 超过 32 MiB');const result=await request('import',{name:$('filename').value.trim(),bytes:new Uint8Array(await file.arrayBuffer())});fillSaves(result.saves);status('已校验并导入，关卡仅保存在本地。')});
+$('repair-plants').onclick=()=>action(async()=>{const name=$('save-list').value,result=await request('repair-plant-attacks',{name});if(result.bytes)download(result.bytes,name.replace('.dat64','.repaired.dat64'),'application/octet-stream');status(result.bytes?'已下载修复副本，原档未改动。':'没有发现已知植物卡死状态，原档未改动。')});
+$('export-users').onclick=()=>action(async()=>{const result=await request('export-users');for(const [name,bytes]of result.files)download(bytes,name,'application/octet-stream');status('已导出用户列表和用户进度；关卡 DAT64 请单独导出。')});
 $('close').onclick=()=>{if(host)request('close').catch(error=>status(error.message,true));else status('可直接关闭此页面。')};
-paintOptions();render();if(parent!==window){document.querySelector('main').inert=true;document.querySelector('nav').inert=true;parent.postMessage({channel,op:'ready'},origin)}else{try{library=new LineupLibrary(localStorage,[],{key:'pvz_devtools_lineup_library_v1',customKey:'pvz_devtools_lineups'});custom=library.snapshot().lineups;fillPresets();status('独立布阵模式：支持阵型码与 JSON；DAT64 请从游戏网页的“自定义存档”入口处理。')}catch(error){status('阵型库读取失败：'+error.message,true)}}
+paintOptions();render();if(parent!==window){document.querySelector('main').inert=true;document.querySelector('nav').inert=true;parent.postMessage({channel,op:'ready'},origin)}else{
+ document.querySelector('main').inert=true;document.querySelector('nav').inert=true;
+ import('./save-standalone.js').then(async({createStandalone})=>{standalone=await createStandalone();window.postMessage({channel,op:'init',payload:await standalone.initial()},origin)}).catch(error=>status('独立工具加载失败：'+error.message,true));
+}
 })();

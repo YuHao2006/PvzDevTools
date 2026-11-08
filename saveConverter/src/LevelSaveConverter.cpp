@@ -1,6 +1,6 @@
 #include "LevelSaveConverter.h"
 
-// The standalone converter and game probes share the game-source include root.
+// Frozen file-format contracts owned by this standalone tool repository.
 #include "ConstEnums.h"
 #include "Lawn/System/LevelSaveFormat.h"
 #include "Lawn/System/Dat64TimeSchema.h"
@@ -3504,6 +3504,199 @@ ConversionResult ConvertFile(
         aSource.size(),
         aTarget.size()
     };
+}
+
+void DecodeV4Model(const std::filesystem::path& input, const std::filesystem::path& output)
+{
+    const auto source = ReadFileFully(input);
+    if (source.size() < 12 || ReadU32At(source, 8) != 4) Fail("Editing model requires DAT64 v4");
+    std::uint32_t date = 0;
+    const auto doc = ParseDat64(source, date);
+    Writer writer;
+    constexpr std::array<Byte,8> magic{'P','V','Z','M','D','L','0','4'};
+    writer.Bytes(magic);
+    writer.U32(static_cast<std::uint32_t>(doc.mNanoseconds.size()));
+    for (auto ns : doc.mNanoseconds) writer.U64(ns);
+    writer.SyncBytes(doc.mCanonicalBoard);
+    for (const auto& pool : doc.mArrays) {
+        writer.U32(pool.mFreeListHead);writer.U32(pool.mMaxUsedCount);writer.U32(pool.mSize);
+        for (const auto& slot : pool.mSlots) {
+            writer.U32(slot.mID);writer.SyncBytes(slot.mCanonicalRecord);writer.SyncBytes(slot.mV7State);
+        }
+    }
+    const auto ModelIds=[&](const auto& ids){writer.U32(static_cast<std::uint32_t>(ids.size()));for(auto id:ids)writer.U32(id);};
+    writer.U32(static_cast<std::uint32_t>(doc.mParticleSystems.size()));
+    for (const auto& system : doc.mParticleSystems) {
+        writer.I32(system.mDefinitionID);ModelIds(system.mEmitterIDs);
+        writer.U32(static_cast<std::uint32_t>(system.mEmitters.size()));
+        for (const auto& emitter : system.mEmitters) {
+            writer.I32(emitter.mDefinitionIndex);writer.I32(emitter.mImageResourceID);ModelIds(emitter.mParticleIDs);
+        }
+    }
+    writer.U32(static_cast<std::uint32_t>(doc.mReanimations.size()));
+    for (const auto& animation : doc.mReanimations) {
+        writer.I32(animation.mDefinitionID);writer.U32(static_cast<std::uint32_t>(animation.mCanonicalTracks.size()));
+        for (const auto& track : animation.mCanonicalTracks) writer.SyncBytes(track);
+        writer.U32(static_cast<std::uint32_t>(animation.mImageResourceIDs.size()));
+        for (auto id : animation.mImageResourceIDs) writer.I32(id);
+    }
+    for (const auto* record : {&doc.mCursorObject,&doc.mCursorPreview,&doc.mMessageWidget,&doc.mSeedBank,&doc.mChallenge,&doc.mMusic}) writer.SyncBytes(*record);
+    AtomicWrite(output,writer.mData);
+}
+
+void EncodeV4Model(const std::filesystem::path& input, const std::filesystem::path& output)
+{
+    const auto source = ReadFileFully(input);
+    if (source.size() > 32*1024*1024) Fail("Editing model exceeds 32 MiB");
+    Reader reader(source);
+    const auto magic = reader.Bytes(8,"Model.magic");
+    if (std::string_view(reinterpret_cast<const char*>(magic.data()),8)!="PVZMDL04") Fail("Invalid editing model version");
+    Document doc;
+    const auto Count = [&](std::uint32_t maximum) {
+        const auto count=reader.U32("Model.count");
+        if (count>maximum || count>reader.Remaining()/4) Fail("Editing model count exceeds bounds");
+        return count;
+    };
+    const auto Vector = [&](std::size_t maximum) {
+        const auto count=reader.U32("Model.recordSize");
+        if(count>maximum) Fail("Editing model record exceeds bounds");
+        const auto bytes=reader.Bytes(count,"Model.record");return std::vector<Byte>(bytes.begin(),bytes.end());
+    };
+    for (auto count=Count(1000000);count--;) doc.mNanoseconds.push_back(reader.U64("Model.time"));
+    doc.mCanonicalBoard=Vector(LevelSaveFormat::DAT64_BOARD_STATE_SIZE);
+    for (std::size_t index=0;index<doc.mArrays.size();++index) {
+        auto& pool=doc.mArrays[index];const auto& descriptor=ARRAY_DESCRIPTORS[index];pool.mKind=descriptor.mKind;
+        pool.mFreeListHead=reader.U32("Model.free");pool.mMaxUsedCount=reader.U32("Model.used");pool.mSize=reader.U32("Model.live");
+        if(pool.mMaxUsedCount>descriptor.mCapacity || pool.mSize>pool.mMaxUsedCount) Fail("Editing pool exceeds capacity");
+        const auto& layout=LevelSaveFormat::GetRecordLayout(pool.mKind);
+        for (std::uint32_t at=0;at<pool.mMaxUsedCount;++at) {
+            SlotSnapshot slot;slot.mID=reader.U32("Model.id");slot.mCanonicalRecord=Vector(layout.mDat64Size);slot.mV7State=Vector(V7SaveSchema::Size(pool.mKind));
+            if(slot.mCanonicalRecord.size()!=layout.mDat64Size || slot.mV7State.size()!=V7SaveSchema::Size(pool.mKind)) Fail("Editing record has wrong size");
+            pool.mSlots.push_back(std::move(slot));
+        }
+    }
+    for (auto count=Count(1024);count--;) {
+        ParticleSystemSupplement system;system.mDefinitionID=reader.I32("Model.particleDefinition");
+        for (auto n=Count(1024);n--;) system.mEmitterIDs.push_back(reader.U32("Model.emitterId"));
+        for (auto n=Count(1024);n--;) {
+            EmitterSupplement emitter;emitter.mDefinitionIndex=reader.I32("Model.emitterDefinition");emitter.mImageResourceID=reader.I32("Model.emitterImage");
+            for (auto p=Count(1024);p--;) emitter.mParticleIDs.push_back(reader.U32("Model.particleId"));
+            system.mEmitters.push_back(std::move(emitter));
+        }
+        if(system.mEmitterIDs.size()!=system.mEmitters.size()) Fail("Editing particle emitter lists differ");
+        doc.mParticleSystems.push_back(std::move(system));
+    }
+    for (auto count=Count(1024);count--;) {
+        ReanimationSupplement animation;animation.mDefinitionID=reader.I32("Model.animationDefinition");
+        for(auto n=Count(4096);n--;) {
+            auto track=Vector(LevelSaveFormat::GetRecordLayout(RecordKind::ReanimatorTrackInstance).mDat64Size);
+            if(track.size()!=LevelSaveFormat::GetRecordLayout(RecordKind::ReanimatorTrackInstance).mDat64Size) Fail("Editing animation track size is invalid");
+            animation.mCanonicalTracks.push_back(std::move(track));
+        }
+        for(auto n=Count(4096);n--;) animation.mImageResourceIDs.push_back(reader.I32("Model.animationImage"));
+        doc.mReanimations.push_back(std::move(animation));
+    }
+    for (auto* record : {&doc.mCursorObject,&doc.mCursorPreview,&doc.mMessageWidget,&doc.mSeedBank,&doc.mChallenge,&doc.mMusic}) *record=Vector(16384);
+    if(reader.Remaining()) Fail("Trailing editing model bytes");
+    const auto bytes=WriteFileImage(doc,Format::Dat64V4,0);
+    std::uint32_t date=0;const auto checked=ParseDat64(bytes,date);
+    if(checked.mArrays!=doc.mArrays || checked.mNanoseconds!=doc.mNanoseconds) Fail("Editing model failed serialization roundtrip");
+    AtomicWrite(output,bytes);
+}
+
+std::string V4ModelSchema()
+{
+    std::ostringstream out;out<<"{\"pools\":[";
+    bool comma=false;
+    for(const auto& pool:ARRAY_DESCRIPTORS){if(comma)out<<',';comma=true;out<<"{\"name\":\""<<pool.mName<<"\",\"capacity\":"<<pool.mCapacity<<",\"times\":[";
+        bool separator=false;for(const auto& field:Dat64TimeSchema::GetFields(pool.mKind)){if(separator)out<<',';separator=true;out<<"{\"name\":\""<<field.mName<<"\",\"offset\":"<<field.mOffset<<'}';}out<<"]}";
+    }
+    out<<"],\"fixed\":[";comma=false;int fixedIndex=0;
+    for(const auto kind:{RecordKind::Zombie,RecordKind::ReanimatorTrackInstance,RecordKind::CursorObject,RecordKind::CursorPreview,RecordKind::MessageWidget,RecordKind::Projectile,RecordKind::Challenge,RecordKind::Music}) {
+        if(comma)out<<',';comma=true;out<<'[';bool separator=false;
+        const auto fields=fixedIndex++==0?Dat64TimeSchema::BoardFields():fixedIndex==6?Dat64TimeSchema::SeedBankFields():Dat64TimeSchema::GetFields(kind);
+        for(const auto& field:fields){if(separator)out<<',';separator=true;out<<"{\"name\":\""<<field.mName<<"\",\"offset\":"<<field.mOffset<<'}';}out<<']';
+    }
+    out<<"]}";return out.str();
+}
+
+
+std::string InspectV4File(const std::filesystem::path& input, int mode)
+{
+    if (mode < 0 || mode > 72) Fail("Invalid save mode");
+    const auto bytes = ReadFileFully(input);
+    if (bytes.size() < 12 || ReadU32At(bytes, 8) != 4)
+        Fail("The save editor supports DAT64 v4 only");
+    std::uint32_t date = 0;
+    const auto document = ParseDat64(bytes, date);
+    std::array<unsigned short, 54> cells{};
+    int plants = 0, healthy = 0, mowers = 0, rake = 0;
+    for (const auto& pool : document.mArrays) {
+        for (const auto& slot : pool.mSlots) {
+            if (!(slot.mID & DATA_ARRAY_KEY_MASK)) continue;
+            const auto& record = slot.mCanonicalRecord;
+            if (pool.mKind == RecordKind::Plant) {
+                if (record.at(333) || record.at(334)) continue;
+                const auto type = ReadI32At(record, 48), x = ReadI32At(record, 52), y = ReadI32At(record, 36);
+                if (type < 0 || type >= 48 || x < 0 || x >= 9 || y < 0 || y >= 6)
+                    Fail("Unsupported plant in DAT64");
+                auto& cell = cells[y * 9 + x];
+                const bool im = ReadI32At(record, 324) == 48;
+                ++plants;
+                if (ReadI32At(record, 76) == ReadI32At(record, 80)) ++healthy;
+                if (type == 16 || type == 33) cell |= ((type == 16 ? 1 : 2) << 6) | (im << 5);
+                else if (type == 30) cell |= 16 | (im << 3);
+                else if (type == 35) cell |= 4 | (im << 1);
+                else {
+                    if (cell >> 10) Fail("More than one main plant in a tile");
+                    cell |= ((type + 1) << 10) | (im << 9) | (!record.at(335) << 8);
+                }
+            } else if (pool.mKind == RecordKind::LawnMower) {
+                if (!record.at(56)) ++mowers;
+            } else if (pool.mKind == RecordKind::GridItem) {
+                if (record.at(40)) continue;
+                const auto type = ReadI32At(record, 16), x = ReadI32At(record, 24), y = ReadI32At(record, 28);
+                if (x < 0 || x >= 9 || y < 0 || y >= 6) continue;
+                auto& cell = cells[y * 9 + x];
+                if (type == 1) cell = (cell & ~0xe0) | 0xc0;
+                if (type == 3) cell |= 1;
+                if (type == 11) rake = y + 1;
+            }
+        }
+    }
+    const auto& board = document.mCanonicalBoard;
+    bool repick = false;
+    const auto fields = Dat64TimeSchema::BoardFields();
+    for (std::size_t index = 0; index < fields.size(); ++index)
+        if (std::string_view(fields[index].mName) == "mNextSurvivalStageCounter")
+            repick = std::bit_cast<std::int64_t>(document.mNanoseconds.at(index)) > 0;
+    const int waves = ReadI32At(board, 22032 - 528);
+    int currentWave = ReadI32At(board, 22056 - 528);
+    const int perFlag = mode == 0 && waves < 10 ? std::max(1, waves) : 10;
+    if (currentWave > 0 && currentWave % perFlag == 0 &&
+        ReadI32At(board, 22188 - 528) < 0 && !repick && !(mode == 0 && ReadI32At(board, 22012 - 528) == 1))
+        --currentWave;
+    const int stageWaves = mode >= GAMEMODE_SURVIVAL_ENDLESS_STAGE_1 && mode <= GAMEMODE_SURVIVAL_HARD_STAGE_5 ? 20 :
+        mode == GAMEMODE_MINIGAME_LAST_STAND || (mode >= GAMEMODE_SURVIVAL_NORMAL_STAGE_1 && mode <= GAMEMODE_SURVIVAL_NORMAL_STAGE_5) ? 10 : 0;
+    const auto flags = std::int64_t(ReadI32At(document.mChallenge, 116)) * stageWaves / perFlag + currentWave / perFlag;
+    std::ostringstream out;
+    out << std::setprecision(std::numeric_limits<double>::max_digits10);
+    out << "{\"mode\":" << mode << ",\"level\":" << ReadI32At(board, 22012 - 528)
+        << ",\"sun\":" << ReadI32At(board, 22028 - 528) << ",\"mowers\":" << mowers
+        << ",\"healthyPlants\":" << healthy << ",\"plants\":" << plants
+        << ",\"cards\":" << ReadI32At(document.mSeedBank, 48)
+        << ",\"scene\":" << ReadI32At(board, 22008 - 528) << ",\"rake\":" << rake
+        << ",\"flags\":" << flags << ",\"repickPending\":" << (repick ? "true" : "false")
+        << ",\"seed\":" << ReadI32At(board, 22216 - 528) << ",\"music\":{\"tune\":" << ReadI32At(document.mMusic, 16)
+        << ",\"order\":" << ReadI32At(document.mMusic, 64) << ",\"drumsOrder\":" << ReadI32At(document.mMusic, 68)
+        << ",\"tempo\":" << ReadFloatAt(document.mMusic, 36) << ",\"speed\":" << ReadFloatAt(document.mMusic, 40)
+        << "},\"cells\":[";
+    for (std::size_t index = 0; index < cells.size(); ++index) {
+        if (index) out << ',';
+        out << cells[index];
+    }
+    out << "]}";
+    return out.str();
 }
 
 std::vector<PlantAttackRepair> RepairPlantAttacks(

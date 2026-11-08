@@ -42,6 +42,16 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
     const std::filesystem::path& input,
     const std::filesystem::path& output = {});
 
+// Validates the complete frozen v4 document before returning editor metadata.
+// No game classes, definitions, graphics, audio or resource package are loaded.
+std::string InspectV4File(const std::filesystem::path& input, int mode);
+
+// Tool-owned, versioned editing model. This contains serialized records only;
+// it is never a native game object layout or an executable game instance.
+void DecodeV4Model(const std::filesystem::path& input, const std::filesystem::path& output);
+void EncodeV4Model(const std::filesystem::path& input, const std::filesystem::path& output);
+std::string V4ModelSchema();
+
 // 玩家明细档：user<ID>.dat（1073 v12 布局，挑战记录/小游戏完成槽序=旧模式
 // 值-1 恒等式）与 user<ID>.dat64（PVZUSR64 魔数 + v13 明细流，槽序=GameMode
 // v3 直下标）。转换做字段级走读+槽序搬运，绝不字节手术（变长段前缀使后续

@@ -7,7 +7,7 @@ const {chromium}=await import(process.env.PVZ_PLAYWRIGHT_MODULE);
 const game=path.resolve(process.argv[2]||'../PlantsVsZombiesModern');
 const html=await fs.readFile('dist/web/save-converter.html','utf8');
 const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'pvz-web-converter-test-'));
-const native=path.join(game,'tools/bin/windows-x64/pvz_dat64_converter.exe');
+const native=process.env.PVZ_NATIVE_SAVE_CONVERTER||path.join(game,'tools/bin/windows-x64/pvz_dat64_converter.exe');
 const source=path.join(game,'Tests/game3_13.dat'),profile=path.join(game,'out/x64-win32-vulkan/Release/data/user1.dat64');
 const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
 try{
@@ -15,14 +15,15 @@ try{
  page.on('pageerror',error=>errors.push(String(error)));page.on('request',request=>requests.push(request.url()));
  await page.route('http://127.0.0.1:19999/',route=>route.fulfill({contentType:'text/html',body:html}));
  await page.goto('http://127.0.0.1:19999/');
+ let conversionIndex=0;
  async function convert(input,target,expectedName){
-  await page.locator('#file').setInputFiles(input);await page.locator('#target').selectOption(String(target));await page.locator('#round').check();
+  await page.locator('#file').setInputFiles({name:path.basename(input).replace(/^\d+-/,''),mimeType:'application/octet-stream',buffer:await fs.readFile(input)});await page.locator('#target').selectOption(String(target));await page.locator('#round').check();
   await page.locator('#convert').click();
   await page.waitForFunction(()=>!document.getElementById('convert').disabled,null,{timeout:60000});
   assert.equal(await page.locator('#status').textContent(),'转换成功，原文件未修改。');
   const downloadPromise=page.waitForEvent('download');await page.locator('#download').click();const download=await downloadPromise;
   assert.equal(download.suggestedFilename(),expectedName);
-  const destination=path.join(temporary,expectedName);await download.saveAs(destination);return destination;
+  const destination=path.join(temporary,(conversionIndex++)+"-"+expectedName);await download.saveAs(destination);return destination;
  }
  const original=await fs.readFile(source);
  const current=await convert(source,4,'game3_58.dat64');
@@ -31,6 +32,12 @@ try{
  const back=await convert(current,0,'game3_13.dat');
  const expectedOriginal=path.join(temporary,'native-original.dat');execFileSync(native,['--target','legacy','--round-time','nearest',current,expectedOriginal]);
  assert.deepEqual(await fs.readFile(back),await fs.readFile(expectedOriginal));
+ const v5=await convert(current,5,'game3_58.dat64');
+ const expected5=path.join(temporary,'native-v5.dat64');execFileSync(native,['--target','dat64-v5',current,expected5]);
+ assert.deepEqual(await fs.readFile(v5),await fs.readFile(expected5));
+ assert.equal((await fs.readFile(v5)).readUInt32LE(8),5);
+ const v4Again=await convert(v5,4,'game3_58.dat64');
+ assert.deepEqual(await fs.readFile(v4Again),await fs.readFile(current));
  const userOriginal=await convert(profile,0,'user1.dat');
  const userBack=await convert(userOriginal,4,'user1.dat64');
  assert.deepEqual(await fs.readFile(userBack),await fs.readFile(profile));
@@ -40,5 +47,5 @@ try{
  assert.match(await page.locator('#status').textContent(),/转换失败/);assert.equal(await page.locator('#download').isVisible(),false);
  assert.deepEqual(await fs.readFile(source),original);assert.deepEqual(errors,[]);
  assert.deepEqual(requests,['http://127.0.0.1:19999/'],'Converter must not fetch Wasm or game assets');
- console.log('PASS isolated converter Wasm: original/v4 native byte parity, mode filename remapping, user roundtrip, malformed version rejection, no game runtime/assets, input preserved');
+ console.log('PASS isolated converter Wasm: original/v4/v5 native byte parity and exact v4/v5 roundtrip, mode filename remapping, user roundtrip, malformed version rejection, no game runtime/assets, input preserved');
 }finally{await browser.close()}

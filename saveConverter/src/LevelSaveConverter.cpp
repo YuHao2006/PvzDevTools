@@ -50,7 +50,7 @@ using LevelSaveFormat::RecordLayout;
 
 constexpr bool HasV7State(Format format)
 {
-    return format == Format::Dat64V4;
+    return format == Format::Dat64V4 || format == Format::Dat64V5;
 }
 constexpr bool IsNanosecondFormat(Format format)
 {
@@ -414,6 +414,9 @@ Format Dat64Format(std::span<const Byte> file)
             ReadU32At(file, 36) == LevelSaveFormat::DAT64_SCHEMA_ID)
             return Format::Dat64V4;
         Fail(36, "dat64.schema", "不支持的 v4 schema");
+    case 5:
+        if (ReadU32At(file, 40) == 0 && ReadU32At(file, 36) == 0x00010746U) return Format::Dat64V5;
+        Fail(36, "dat64.schema", "Unsupported v5 schema");
     case 3:
         Fail(8, "dat64.version", "DAT64 v3 系列开发格式已停止支持；仅支持原版 DAT、DAT64 v1、v2、v4");
     default: Fail(8, "dat64.version", "不支持的存档版本");
@@ -1640,6 +1643,63 @@ void VisitTimeRecords(Document& document, Callback callback)
     callback(document.mMusic, Dat64TimeSchema::GetFields(RecordKind::Music));
 }
 
+// v5 stores the next-wave deadline in Board time and track blend deadlines
+// in the owning reanimation's saved clock. The tool model stays v4-neutral.
+void TransformV5Times(Document& document, bool encode)
+{
+    const auto boardNow = SavedBattleClock(document);
+    std::unordered_map<const Byte*, std::int64_t> trackClocks;
+    std::size_t animationIndex = 0;
+    for (const auto& slot : document.mArrays[9].mSlots)
+    {
+        if (!(slot.mID & DATA_ARRAY_KEY_MASK)) continue;
+        const auto now = static_cast<std::int64_t>(V7SaveSchema::Read(slot.mV7State, 64, 8));
+        for (const auto& track : document.mReanimations.at(animationIndex++).mCanonicalTracks)
+            trackClocks.emplace(track.data(), now);
+    }
+    std::size_t index = 0;
+    VisitTimeRecords(document, [&](auto& bytes, Dat64TimeSchema::Fields fields) {
+        const auto track = trackClocks.find(bytes.data());
+        for (const auto& field : fields)
+        {
+            const bool wave = bytes.data() == document.mCanonicalBoard.data() &&
+                std::string_view(field.mName) == "mZombieCountDown";
+            const bool boardEnd = bytes.data() == document.mCanonicalBoard.data() &&
+                (std::string_view(field.mName)=="mOutOfMoneyCounter" ||
+                 std::string_view(field.mName)=="mCobCannonCursorDelayCounter");
+            const bool blend = track != trackClocks.end() && field.mOffset == 0;
+            auto& bits = document.mNanoseconds.at(index++);
+            if (!wave && !blend && !boardEnd) continue;
+            const auto value = std::bit_cast<std::int64_t>(bits);
+            const auto now = wave || boardEnd ? boardNow : track->second;
+            std::int64_t result;
+            if ((blend || boardEnd) && value == 0) result = 0;
+            else if (encode)
+            {
+                if ((now > 0 && value > INT64_MAX-now) || (now < 0 && value < INT64_MIN-now))
+                    Fail("v5 deadline exceeds signed nanosecond range");
+                result = value + now;
+            }
+            else
+            {
+                if ((now < 0 && value > INT64_MAX+now) || (now > 0 && value < INT64_MIN+now))
+                    Fail("v5 remaining time exceeds signed nanosecond range");
+                result = value - now;
+                if (blend) result = std::max<std::int64_t>(0, result);
+            }
+            bits = std::bit_cast<std::uint64_t>(result);
+            if (!encode)
+            {
+                std::uint32_t placeholder = 0;
+                try { placeholder = Dat64TimeSchema::QuantizeNanoseconds(field, bits, true); }
+                catch (const std::exception&) {}
+                WriteU32At(bytes, field.mOffset, placeholder);
+            }
+        }
+    });
+    if (index != document.mNanoseconds.size()) Fail("v5 time field count mismatch");
+}
+
 void CaptureLegacyTimes(Document& document)
 {
     document.mNanoseconds.clear();
@@ -2664,6 +2724,7 @@ Document ParseDat64(std::span<const Byte> theFile, std::uint32_t& theDateEcho)
         WriteU32At(aDocument.mSeedBank, SEED_BANK_DATE_ECHO_OFFSET, anEcho);
     }
     theDateEcho = anEcho;
+    if (format == Format::Dat64V5) TransformV5Times(aDocument, false);
     return aDocument;
 }
 
@@ -2754,7 +2815,8 @@ std::vector<Byte> WritePayload(
     const Document& theSourceDocument,
     Format theFormat)
 {
-    const Document theDocument = ParticleImagesForOutput(theSourceDocument, theFormat);
+    Document theDocument = ParticleImagesForOutput(theSourceDocument, theFormat);
+    if (theFormat == Format::Dat64V5) TransformV5Times(theDocument, true);
     BoardDialect aDialect = BoardDialect::Canonical;
     Writer aWriter;
     aWriter.mNanoseconds = &theDocument.mNanoseconds;
@@ -2903,7 +2965,7 @@ std::vector<Byte> WriteFileImage(
     else
     {
         aFile.Bytes(LevelSaveFormat::DAT64_MAGIC);
-        aFile.U32(HasV7State(theFormat) ? LevelSaveFormat::DAT64_VERSION :
+        aFile.U32(theFormat == Format::Dat64V5 ? 5 : HasV7State(theFormat) ? LevelSaveFormat::DAT64_VERSION :
             theFormat == Format::Dat64V2 ? LevelSaveFormat::DAT64_V2_VERSION : LevelSaveFormat::DAT64_V1_VERSION);
         aFile.U32(LevelSaveFormat::DAT64_HEADER_SIZE);
         aFile.U32(LevelSaveFormat::DAT64_AUTHORITY_BUILD);
@@ -2912,7 +2974,7 @@ std::vector<Byte> WriteFileImage(
         // v1 exports retain a CRC for older readers; v2/v4 reserve the slot
         // as zero. No version requires a matching CRC on input.
         aFile.U32(theFormat == Format::Dat64V1 ? Crc32(aPayload) : 0);
-        aFile.U32(theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_SCHEMA_ID :
+        aFile.U32(theFormat == Format::Dat64V5 ? 0x00010746U : theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_SCHEMA_ID :
             theFormat == Format::Dat64V2 ? LevelSaveFormat::DAT64_V2_SCHEMA_ID : LevelSaveFormat::DAT64_V1_SCHEMA_ID);
         aFile.U32(theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_MINOR_VERSION : 0);
         aFile.U32(0);
@@ -3346,6 +3408,7 @@ const char* FormatName(Format theFormat)
     case Format::Dat64V1: return "Legacy dat64 v1";
     case Format::Dat64V2: return "Nanosecond dat64 v2";
     case Format::Dat64V4: return "Frame-cursor dat64 v4";
+    case Format::Dat64V5: return "Deadline dat64 v5";
     }
     return "Unknown";
 }
@@ -3449,9 +3512,25 @@ ConversionResult ConvertFile(
     std::uint32_t aDateEcho = 0;
     Document aDocument = Parse(aSource, aSourceFormat, aDateEcho);
     const Format aTargetFormat = theOptions.mTargetFormat.value_or(
-        aSourceFormat == Format::Legacy1073Dat ? Format::Dat64V4 : Format::Legacy1073Dat);
+        aSourceFormat == Format::Legacy1073Dat ? Format::Dat64V5 : Format::Legacy1073Dat);
+    if (aTargetFormat == Format::Dat64V5 && aSourceFormat != Format::Dat64V5)
+    {
+        const auto fields = Dat64TimeSchema::BoardFields();
+        std::size_t wave = SIZE_MAX, huge = SIZE_MAX;
+        for (std::size_t i=0;i<fields.size();++i)
+        {
+            if (std::string_view(fields[i].mName)=="mZombieCountDown") wave=i;
+            if (std::string_view(fields[i].mName)=="mHugeWaveCountDown") huge=i;
+        }
+        if (wave!=SIZE_MAX && huge!=SIZE_MAX && std::bit_cast<std::int64_t>(aDocument.mNanoseconds[huge])>0)
+        {
+            aDocument.mNanoseconds[wave]=aDocument.mNanoseconds[huge];
+            WriteU32At(aDocument.mCanonicalBoard,fields[wave].mOffset,
+                Dat64TimeSchema::QuantizeNanoseconds(fields[wave],aDocument.mNanoseconds[wave],true));
+        }
+    }
     PrepareAppearanceOutput(aDocument, aTargetFormat);
-    if (aSourceFormat == Format::Dat64V4 && aTargetFormat != Format::Dat64V4)
+    if (HasV7State(aSourceFormat) && !HasV7State(aTargetFormat))
     {
         std::size_t index = 0;
         VisitTimeRecords(aDocument, [&](auto& bytes, Dat64TimeSchema::Fields fields) {
@@ -3478,7 +3557,7 @@ ConversionResult ConvertFile(
     PrepareV7Output(aDocument, aTargetFormat);
     // Earlier magnet tails held start vectors and lookup parameters. They are
     // not velocities: discard those transient trajectory parameters explicitly.
-    if (aTargetFormat == Format::Dat64V4 && aSourceFormat != Format::Dat64V4)
+    if (HasV7State(aTargetFormat) && !HasV7State(aSourceFormat))
         for (auto& array : aDocument.mArrays)
             if (array.mKind == RecordKind::Plant)
                 for (auto& slot : array.mSlots)
@@ -3509,7 +3588,7 @@ ConversionResult ConvertFile(
 void DecodeV4Model(const std::filesystem::path& input, const std::filesystem::path& output)
 {
     const auto source = ReadFileFully(input);
-    if (source.size() < 12 || ReadU32At(source, 8) != 4) Fail("Editing model requires DAT64 v4");
+    if (source.size() < 12 || (ReadU32At(source, 8) != 4 && ReadU32At(source, 8) != 5)) Fail("Editing model requires DAT64 v4/v5");
     std::uint32_t date = 0;
     const auto doc = ParseDat64(source, date);
     Writer writer;
@@ -3625,8 +3704,8 @@ std::string InspectV4File(const std::filesystem::path& input, int mode)
 {
     if (mode < 0 || mode > 72) Fail("Invalid save mode");
     const auto bytes = ReadFileFully(input);
-    if (bytes.size() < 12 || ReadU32At(bytes, 8) != 4)
-        Fail("The save editor supports DAT64 v4 only");
+    if (bytes.size() < 12 || (ReadU32At(bytes, 8) != 4 && ReadU32At(bytes, 8) != 5))
+        Fail("The save editor supports DAT64 v4/v5 only");
     std::uint32_t date = 0;
     const auto document = ParseDat64(bytes, date);
     std::array<unsigned short, 54> cells{};
@@ -3707,8 +3786,9 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
         sourcePath == std::filesystem::absolute(output).lexically_normal()))
         Fail("Repair output must be a new file; input and existing files are never overwritten");
     const auto source = ReadFileFully(sourcePath);
-    if (DetectFormat(sourcePath) != Format::Dat64V4)
-        Fail("Plant attack repair supports DAT64 v4 only");
+    const auto repairFormat = DetectFormat(sourcePath);
+    if (!HasV7State(repairFormat))
+        Fail("Plant attack repair supports DAT64 v4/v5 only");
     std::uint32_t date = 0;
     auto document = ParseDat64(source, date);
     const auto original = document;
@@ -3749,8 +3829,8 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
         }
     });
     if (output.empty()) return repairs;
-    const auto canonicalOriginal = WriteFileImage(original, Format::Dat64V4, date);
-    const auto canonicalRepaired = WriteFileImage(document, Format::Dat64V4, date);
+    const auto canonicalOriginal = WriteFileImage(original, repairFormat, date);
+    const auto canonicalRepaired = WriteFileImage(document, repairFormat, date);
     if (source.size() != canonicalOriginal.size() || source.size() != canonicalRepaired.size())
         Fail("Repair unexpectedly changed the wire layout");
     auto image = source;

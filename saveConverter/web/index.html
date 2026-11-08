@@ -8,9 +8,9 @@
 <p>在本机浏览器中转换关卡档和用户资料，不上传文件，不加载游戏资源。原文件保持不变，转换结果另行下载。</p>
 <label for="file">存档文件</label><input id="file" type="file" accept=".dat,.dat64">
 <small>支持 game&lt;用户ID&gt;_&lt;模式&gt;.dat／.dat64 和 user&lt;用户ID&gt;.dat／.dat64。关卡模式编号会自动转换。</small>
-<label for="target">目标格式</label><select id="target"><option value="4">pvz_perf DAT64 v4</option><option value="0">原版 1.2.0.1073 DAT</option></select>
+<label for="target">目标格式</label><select id="target"><option value="5">pvz_perf v4 · DAT64 v5（开发中）</option><option value="4">pvz_perf v3 · DAT64 v4</option><option value="0">原版 1.2.0.1073 DAT</option></select>
 <label class="check"><input id="round" type="checkbox"><span>导出原版时，允许把纳秒时间舍入到原版的 10 毫秒单位。</span></label>
-<small>DAT64 v1～v3 不支持。v5 将在破坏性更新的字段格式定稿后加入，不把 v4 改头冒充 v5。</small>
+<small>DAT64 v1～v3 不支持。v5使用预期刷新时间和轨道混合结束时间；开发期字段尚未冻结。</small>
 <button id="convert" disabled>转换并生成下载文件</button><p id="status" role="status" aria-live="polite">请选择存档文件。</p><a id="download" hidden>下载转换结果</a>
 </main>
 <script id="worker-source" type="text/plain">/* CONVERTER_CORE */</script>

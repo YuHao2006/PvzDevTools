@@ -49,7 +49,7 @@ void PrintUsage(const std::filesystem::path& theProgram)
         << "用法：\n  " << theProgram.filename().string()
         << "\n  " << theProgram.filename().string()
         << " <输入 game*.dat|game*.dat64|user*.dat|user*.dat64> [输出文件]\n\n"
-        << "选项：--target legacy|dat64-v1|dat64-v2|dat64-v4；--round-time nearest。\n"
+        << "选项：--target legacy|dat64-v1|dat64-v2|dat64-v4|dat64-v5；--round-time nearest。\n"
         << "关卡 .dat 默认生成 dat64 v4；DAT64 默认导出 .dat。\n"
         << "dat64 v4 schema 10745；v3 系列开发存档不再支持。\n"
         << "导出旧格式要求时间精确可表示；只有明确指定 nearest 才允许舍入。\n\n"
@@ -249,9 +249,10 @@ int main(int argc, char** argv)
             }
             if (arg == "--target")
             {
-                if (++i == argc) throw std::runtime_error("--target requires legacy, dat64-v1, dat64-v2 or dat64-v4");
+                if (++i == argc) throw std::runtime_error("--target requires legacy, dat64-v1, dat64-v2, dat64-v4 or dat64-v5");
                 const std::string target = argv[i];
-                if (target == "dat64-v4") options.mTargetFormat = PvzDat64::Format::Dat64V4;
+                if (target == "dat64-v5") options.mTargetFormat = PvzDat64::Format::Dat64V5;
+                else if (target == "dat64-v4") options.mTargetFormat = PvzDat64::Format::Dat64V4;
                 else if (target == "legacy") options.mTargetFormat = PvzDat64::Format::Legacy1073Dat;
                 else if (target == "dat64-v1") options.mTargetFormat = PvzDat64::Format::Dat64V1;
                 else if (target == "dat64-v2") options.mTargetFormat = PvzDat64::Format::Dat64V2;

@@ -10,7 +10,13 @@ onmessage=async({data})=>{
   if(data.request?.op==='generate'){
    generator??=import('./save-generate.js').catch(error=>{generator=null;throw Error('存档生成器模块加载失败（save-generate.js）：'+(error.message||error))});
    const {generateSave}=await generator;
-   const bytes=await generateSave(module,data.request,new Uint8Array(data.profile));
+   let bytes=await generateSave(module,data.request,new Uint8Array(data.profile));
+   if(data.request.format!==4){
+    module.FS.writeFile("/input/generated-v4.dat64",bytes);
+    const converted=module.ccall("pvz_convert_save","string",["string","number","number","number"],["generated-v4.dat64",5,0,0]);
+    if(converted)throw Error(converted);
+    bytes=module.FS.readFile("/output/generated-v4.dat64");
+   }
    module.FS.writeFile('/input/generated.dat64',bytes);
    const invalid=module.ccall('pvz_inspect_save','string',['string','number','number'],['generated.dat64',data.request.mode,0]);
    if(invalid)throw Error('生成存档未通过独立校验：'+invalid);

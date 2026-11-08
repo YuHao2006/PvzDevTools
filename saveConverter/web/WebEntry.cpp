@@ -58,8 +58,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* pvz_convert_save(const char* filenam
     resultName.clear();
     resultError.clear();
     try {
-        if (target != 0 && target != 4)
-            throw std::runtime_error("目标格式尚未定义；当前可转换原版 1073 与 DAT64 v4");
+        if (target != 0 && target != 4 && target != 5)
+            throw std::runtime_error("目标格式尚未定义；当前可转换原版 1073、DAT64 v4 与 v5");
         const std::filesystem::path name(filename);
         if (name.empty() || name != name.filename())
             throw std::runtime_error("输入必须是单个存档文件名");
@@ -74,12 +74,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* pvz_convert_save(const char* filenam
             PvzDat64::ConvertUserFile(input, output);
         } else {
             const auto source = PvzDat64::DetectFormat(input);
-            if (source != PvzDat64::Format::Legacy1073Dat && source != PvzDat64::Format::Dat64V4)
-                throw std::runtime_error("仅支持原版 1073 和 DAT64 v4；不支持旧的 DAT64 v1～v3");
-            const auto destination = target == 0 ? PvzDat64::Format::Legacy1073Dat : PvzDat64::Format::Dat64V4;
+            if (source != PvzDat64::Format::Legacy1073Dat && source != PvzDat64::Format::Dat64V4 && source != PvzDat64::Format::Dat64V5)
+                throw std::runtime_error("仅支持原版 1073、DAT64 v4 和 v5；不支持旧的 DAT64 v1～v3");
+            const auto destination = target == 0 ? PvzDat64::Format::Legacy1073Dat : target == 5 ? PvzDat64::Format::Dat64V5 : PvzDat64::Format::Dat64V4;
             if (source == destination)
                 throw std::runtime_error("输入已经是所选格式");
-            output = "/output" / PvzDat64::DefaultOutputPath(name, source);
+            auto outputName = source == PvzDat64::Format::Legacy1073Dat || destination == PvzDat64::Format::Legacy1073Dat
+                ? PvzDat64::DefaultOutputPath(name, source) : name;
+            outputName.replace_extension(target == 0 ? ".dat" : ".dat64");
+            output = "/output" / outputName;
             PvzDat64::ConversionOptions options;
             options.mTargetFormat = destination;
             options.mRoundTimeToNearestTick = roundTime != 0;

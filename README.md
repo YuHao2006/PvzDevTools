@@ -7,6 +7,7 @@
 | `reanimc.exe` | reanim、particle、projectile DSL 编译、轨道枚举和字符串代码生成、MaxRects 可行布局 |
 | `pvz-resource-build.exe` | 资源配置、字体、原生 CP-SAT 图集求解、PNG 合成、静态 C++ 数据、加载绑定、PAK64 打包和可选重压缩 |
 | `pvz_dat64_converter.exe` | 原版 1073 DAT、DAT64 v1／v2／v4 及用户资料转换 |
+| `pvz-save-repair.exe` | 离线扫描并另存修复已知的玉米炮攻击卡死状态 |
 
 正式资源构建链全部使用 C++23，不启动 Python。测试、输出对拍和性能采集可以使用 Python，不属于游戏运行时依赖。Windows 发布包内附求解器所需的 DLL；它们仅供开发工具使用，不进入游戏资源包或 APK。
 
@@ -97,3 +98,19 @@ OR-Tools 的官方预编译包见 [官方 C++ 安装说明](https://developers.g
 首次迁移验证涵盖 746 个资源包条目、20 份字体、106 份 particle 运行时记录、144 个 reanim 静态定义以及所有生成绑定。Windows Release 发布经校验的二进制和校验和；暂不发布 Linux／macOS 工具二进制。
 
 代码延续原项目 CC0 许可；第三方库仍遵循各自许可。这里不重新授权原游戏的资源。
+
+## 已知坏档修复
+
+游戏不自动修复旧坏档。`pvz-save-repair.exe` 支持 DAT64 v4，仅识别活玉米炮
+处于发射状态、射击计时为零、对应单次保持动画已完成且停在末帧的组合。
+它恢复攻击收尾入口，不重新发射，不重置随机数、植物位置或其他关卡状态；
+不符合特征的异常不会被猜测修复。
+
+```powershell
+./pvz-save-repair.exe game1_0.dat64
+./pvz-save-repair.exe game1_0.dat64 game1_0-repaired.dat64
+```
+
+第一条只扫描，第二条另存副本。目标文件已存在或与输入相同会拒绝写入。
+工具会重新完整解析输出并逐字段验证；原文件始终保留。确认修复副本后，
+由用户在游戏关闭时自行替换对应关卡档。

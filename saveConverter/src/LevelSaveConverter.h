@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace PvzDat64
 {
@@ -29,6 +30,17 @@ struct ConversionResult
     std::uintmax_t mSourceSize;
     std::uintmax_t mTargetSize;
 };
+
+// Offline only: narrowly recognized completed Cob Cannon attacks with an
+// inactive shooting timer. Empty output scans; repair always writes a new file.
+struct PlantAttackRepair {
+    unsigned int mSlot;
+    int mRow;
+    int mColumn;
+};
+std::vector<PlantAttackRepair> RepairPlantAttacks(
+    const std::filesystem::path& input,
+    const std::filesystem::path& output = {});
 
 // 玩家明细档：user<ID>.dat（1073 v12 布局，挑战记录/小游戏完成槽序=旧模式
 // 值-1 恒等式）与 user<ID>.dat64（PVZUSR64 魔数 + v13 明细流，槽序=GameMode

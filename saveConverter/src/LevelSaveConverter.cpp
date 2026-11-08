@@ -3506,6 +3506,78 @@ ConversionResult ConvertFile(
     };
 }
 
+std::vector<PlantAttackRepair> RepairPlantAttacks(
+    const std::filesystem::path& input, const std::filesystem::path& output)
+{
+    const auto sourcePath = std::filesystem::absolute(input).lexically_normal();
+    if (!output.empty() && (std::filesystem::exists(output) ||
+        sourcePath == std::filesystem::absolute(output).lexically_normal()))
+        Fail("Repair output must be a new file; input and existing files are never overwritten");
+    const auto source = ReadFileFully(sourcePath);
+    if (DetectFormat(sourcePath) != Format::Dat64V4)
+        Fail("Plant attack repair supports DAT64 v4 only");
+    std::uint32_t date = 0;
+    auto document = ParseDat64(source, date);
+    const auto original = document;
+    std::vector<PlantAttackRepair> repairs;
+    // These are frozen canonical record offsets, not offsets into native classes.
+    // Seed 47 = Cob Cannon, state 38 = FIRING, loop 3 = PLAY_ONCE_AND_HOLD.
+    std::size_t timeIndex = 0;
+    VisitTimeRecords(document, [&](auto& bytes, Dat64TimeSchema::Fields fields) {
+        for (const auto& field : fields) {
+            const auto index = timeIndex++;
+            if (std::string_view(field.mName) != "mShootingCounter" ||
+                document.mNanoseconds.at(index) != 0) continue;
+            for (auto& plants : document.mArrays) {
+                if (plants.mKind != RecordKind::Plant) continue;
+                for (std::size_t slotIndex = 0; slotIndex < plants.mSlots.size(); ++slotIndex) {
+                    auto& plant = plants.mSlots[slotIndex];
+                    if (&bytes != &plant.mCanonicalRecord || !(plant.mID & DATA_ARRAY_KEY_MASK) ||
+                        ReadI32At(bytes, 48) != 47 || ReadI32At(bytes, 72) != 38 || bytes.at(333)) continue;
+                    const auto animationID = ReadU32At(bytes, 160);
+                    for (const auto& animations : document.mArrays) {
+                        if (animations.mKind != RecordKind::Reanimation) continue;
+                        for (const auto& animation : animations.mSlots) {
+                            const auto& record = animation.mCanonicalRecord;
+                            if (animation.mID != animationID || !(animationID & DATA_ARRAY_KEY_MASK) ||
+                                ReadI32At(record, 24) != 3 || ReadI32At(record, 104) <= 0 ||
+                                record.at(28) || animation.mV7State.size() < 16 ||
+                                ReadI32At(animation.mV7State, 12) != ReadI32At(record, 36) - 1) continue;
+                            repairs.push_back({static_cast<unsigned int>(slotIndex),
+                                ReadI32At(bytes, 36), ReadI32At(bytes, 52)});
+                            // Re-enable normal completion, without replaying the shot.
+                            // One ns is below every shooting event offset. Canonical
+                            // structural validation rounds this remaining time to zero.
+                            document.mNanoseconds[index] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    if (output.empty()) return repairs;
+    const auto canonicalOriginal = WriteFileImage(original, Format::Dat64V4, date);
+    const auto canonicalRepaired = WriteFileImage(document, Format::Dat64V4, date);
+    if (source.size() != canonicalOriginal.size() || source.size() != canonicalRepaired.size())
+        Fail("Repair unexpectedly changed the wire layout");
+    auto image = source;
+    for (std::size_t i = 0; i < image.size(); ++i) {
+        if (canonicalOriginal[i] == canonicalRepaired[i]) continue;
+        if (source[i] != canonicalOriginal[i]) Fail("Repair field differs from its parsed representation");
+        image[i] = canonicalRepaired[i];
+    }
+    std::uint32_t verifiedDate = 0;
+    if (ParseDat64(image, verifiedDate) != document)
+        Fail("Repaired save failed complete canonical round-trip verification");
+    // Guarantee that repair changes only identified timer values. Everything
+    // else, including RNG, coordinates, animation phase and other pools, stays.
+    auto check = document;
+    check.mNanoseconds = original.mNanoseconds;
+    if (check != original) Fail("Repair unexpectedly changed a non-timer field");
+    AtomicWrite(std::filesystem::absolute(output), image);
+    return repairs;
+}
+
 const char* UserFormatName(UserFormat theFormat)
 {
     return theFormat == UserFormat::LegacyUserDat

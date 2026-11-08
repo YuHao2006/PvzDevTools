@@ -17,6 +17,23 @@ export function encodeSummary(profiles){validateProfiles(profiles);const bytes=n
 function layout(bytes){require(bytes instanceof Uint8Array&&bytes.length>=894&&decoder.decode(bytes.subarray(0,8))===magic,'用户明细不是有效的 USER64');const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);require(v.getInt32(8,true)===13,'仅支持 USER64 v13');const plants=v.getInt32(824,true);integer(plants,0,200,'花园植物数');const achievements=828+plants*88;require(achievements+45<=bytes.length,'花园数据不完整');const zombatars=v.getInt32(achievements+41,true);integer(zombatars,0,100,'大头贴数');require(bytes.length===894+plants*88+zombatars*72,'用户明细长度不正确');return {v,achievements,mini:achievements+45+zombatars*72,plants,zombatars}}
 export function decodeProfile(bytes){const {v,achievements,plants,zombatars}=layout(bytes);return {level:v.getInt32(12,true),coins:v.getInt32(16,true)*10,finished:v.getInt32(20,true),records:Array.from({length:100},(_,i)=>v.getInt32(24+i*4,true)),purchases:Array.from({length:80},(_,i)=>v.getInt32(424+i*4,true)),unlocks:[8,9,14].map(i=>v.getInt32(744+i*4,true)!==0),achievements:Array.from({length:20},(_,i)=>v.getUint8(achievements+i*2)!==0),plants,zombatars}}
 export function newProfile(){const bytes=new Uint8Array(894);bytes.set(encoder.encode(magic));const v=new DataView(bytes.buffer);v.setInt32(8,13,true);v.setInt32(12,1,true);return bytes}
+// Same completed USER64 preset as pvz_perf's distributed perfect profile.
+// Always create fresh bytes: adding a user must never alter another user's data.
+export function perfectProfile(){
+ const records=Array(100).fill(0),purchases=Array(80).fill(0);
+ for(let mode=1;mode<=70;mode++)if(mode!==35)records[mode]=1;
+ for(let mode=61;mode<=65;mode++)records[mode]=10;
+ for(let mode=66;mode<=70;mode++)records[mode]=5;
+ records[71]=1000;
+ for(const item of [0,1,2,3,4,5,6,7,8,13,16,17,18,19,20,22,23,25,27,29])purchases[item]=1;
+ purchases[9]=2;purchases[21]=4;purchases[24]=3;
+ for(const item of [14,15])purchases[item]=1020;
+ for(const item of [26,28])purchases[item]=1010;
+ const bytes=patchProfile(newProfile(),{level:1,coins:999990,finished:2,records,purchases,unlocks:[true,true,true],achievements:Array(20).fill(true)}),{v,mini}=layout(bytes);
+ // Already seen Stinky and upsell; suppress the first-use Zombatar notice.
+ v.setInt32(812,1,true);v.setInt32(816,1,true);v.setUint8(mini+20,1);
+ return bytes;
+}
 export function patchProfile(original,patch){
  const bytes=original.slice(),{v,achievements,mini}=layout(bytes),previous=new DataView(original.buffer,original.byteOffset,original.byteLength);
  if('level'in patch)v.setInt32(12,integer(patch.level,1,50,'冒险关卡'),true);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {decodeSummary,encodeSummary,newProfile,decodeProfile,patchProfile} from '../saveEditor/profile-codec.mjs';
+import {decodeSummary,encodeSummary,newProfile,perfectProfile,decodeProfile,patchProfile} from '../saveEditor/profile-codec.mjs';
 import {ProfileStore} from '../saveEditor/profile-store.mjs';
 const empty=newProfile();assert.equal(empty.length,894);assert.equal(decodeProfile(empty).level,1);assert.deepEqual(patchProfile(empty,{}),empty);
 const completed=new Uint8Array(await fs.readFile(path.join(process.env.PVZ_GAME_ROOT||fileURLToPath(new URL('../../PlantsVsZombiesModern/',import.meta.url)),'android/app/src/main/assets/bundled-saves/user1.dat64')));
@@ -23,3 +23,14 @@ assert.throws(()=>store.edit({oldId:1,id:7,name:'Collision',patch:{}}),/占用/)
 assert.equal(store.rows()[0].id,9);assert.equal(files.has('user1.dat64'),false);assert.deepEqual(files.get('game9_58.dat64'),new Uint8Array([1,2,3]));assert.deepEqual(files.get('game9_0.dat64'),new Uint8Array([4,5,6]));assert.deepEqual(files.get('user9.dat64').subarray(828),garden.subarray(828));assert.deepEqual(files.get('game7_58.dat64'),new Uint8Array([8,9]));
 const added=store.add();apply(added);assert.equal(decodeProfile(files.get('user'+added.id+'.dat64')).finished,0);apply(store.remove(9));assert.equal(files.has('game9_58.dat64'),false);assert.equal(files.has('user7.dat64'),true);assert.equal(new TextDecoder().decode(files.get('settings.json')),'keep');
 console.log('USER64 v13/profile summary: roundtrip, defaults, progress edits, opaque garden preservation, ID migration, collisions and deletion passed');
+
+assert.deepEqual(perfectProfile(),completed,'perfect preset matches distributed profile byte for byte');
+const beforePerfect=new Map([...files].map(([name,bytes])=>[name,bytes.slice()]));
+const perfectPlan=store.add({perfect:true});assert.deepEqual(perfectPlan.removes,[]);apply(perfectPlan);
+assert.deepEqual(files.get('user'+perfectPlan.id+'.dat64'),completed);
+for(const [name,bytes] of beforePerfect)if(name!=='users.dat')assert.deepEqual(files.get(name),bytes,'preserved '+name);
+const nextPerfect=store.add({perfect:true});assert.notEqual(nextPerfect.id,perfectPlan.id);apply(nextPerfect);
+assert.equal(new Set(store.rows().map(p=>p.name.toLowerCase())).size,store.rows().length);
+const altered=perfectProfile();altered[12]=50;assert.deepEqual(perfectProfile(),completed);
+assert.equal(decodeProfile(newProfile()).finished,0);
+console.log('perfect-user creation: distributed preset, independent bytes, unique IDs/names and existing saves preserved');

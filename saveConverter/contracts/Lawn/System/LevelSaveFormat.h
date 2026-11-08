@@ -71,7 +71,7 @@ constexpr bool IsSupportedDat64Header(const std::span<const std::uint8_t>& file)
         read(36, 4) == DAT64_V1_SCHEMA_ID;
     const bool v2 = version == DAT64_V2_VERSION && read(40, 4) == 0 &&
         read(36, 4) == DAT64_V2_SCHEMA_ID;
-    const bool v5 = version == 5 && read(40, 4) == 0 && read(36, 4) == 0x00010746U;
+    const bool v5 = version == 5 && read(40, 4) == 1 && read(36, 4) == 0x00010747U;
     return (current || v5 || v1 || v2) && read(12, 4) == DAT64_HEADER_SIZE &&
         read(16, 4) == DAT64_AUTHORITY_BUILD &&
         read(20, 4) == (v1 ? DAT64_V1_FLAGS : DAT64_FLAGS) &&

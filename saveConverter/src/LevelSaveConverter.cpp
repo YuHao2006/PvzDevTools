@@ -415,7 +415,7 @@ Format Dat64Format(std::span<const Byte> file)
             return Format::Dat64V4;
         Fail(36, "dat64.schema", "不支持的 v4 schema");
     case 5:
-        if (ReadU32At(file, 40) == 0 && ReadU32At(file, 36) == 0x00010746U) return Format::Dat64V5;
+        if (ReadU32At(file, 40) == 1 && ReadU32At(file, 36) == 0x00010747U) return Format::Dat64V5;
         Fail(36, "dat64.schema", "Unsupported v5 schema");
     case 3:
         Fail(8, "dat64.version", "DAT64 v3 系列开发格式已停止支持；仅支持原版 DAT、DAT64 v1、v2、v4");
@@ -1649,11 +1649,21 @@ void TransformV5Times(Document& document, bool encode)
 {
     const auto boardNow = SavedBattleClock(document);
     std::unordered_map<const Byte*, std::int64_t> trackClocks;
+    std::unordered_set<const Byte*> plantRecords;
+    for (const auto& array : document.mArrays)
+        if (array.mKind == RecordKind::Plant)
+            for (const auto& slot : array.mSlots) plantRecords.insert(slot.mCanonicalRecord.data());
     std::size_t animationIndex = 0;
-    for (const auto& slot : document.mArrays[9].mSlots)
+    for (auto& slot : document.mArrays[9].mSlots)
     {
         if (!(slot.mID & DATA_ARRAY_KEY_MASK)) continue;
-        const auto now = static_cast<std::int64_t>(V7SaveSchema::Read(slot.mV7State, 64, 8));
+        const auto start = static_cast<std::int64_t>(V7SaveSchema::Read(slot.mV7State, 4, 8));
+        const auto stored = static_cast<std::int64_t>(V7SaveSchema::Read(slot.mV7State, 64, 8));
+        if ((encode && (stored < start || (start < 0 && stored > INT64_MAX + start))) ||
+            (!encode && (stored < 0 || (start > 0 && stored > INT64_MAX - start))))
+            Fail("v5 keyframe remainder exceeds signed nanosecond range");
+        const auto now = encode ? stored : start + stored;
+        V7SaveSchema::Write(slot.mV7State,64,static_cast<std::uint64_t>(encode ? stored-start : now),8);
         for (const auto& track : document.mReanimations.at(animationIndex++).mCanonicalTracks)
             trackClocks.emplace(track.data(), now);
     }
@@ -1667,13 +1677,15 @@ void TransformV5Times(Document& document, bool encode)
             const bool boardEnd = bytes.data() == document.mCanonicalBoard.data() &&
                 (std::string_view(field.mName)=="mOutOfMoneyCounter" ||
                  std::string_view(field.mName)=="mCobCannonCursorDelayCounter");
+            const bool plantEnd = plantRecords.contains(bytes.data()) &&
+                (std::string_view(field.mName)=="mDoSpecialCountdown" || std::string_view(field.mName)=="mBlinkCountdown");
             const bool blend = track != trackClocks.end() && field.mOffset == 0;
             auto& bits = document.mNanoseconds.at(index++);
-            if (!wave && !blend && !boardEnd) continue;
+            if (!wave && !blend && !boardEnd && !plantEnd) continue;
             const auto value = std::bit_cast<std::int64_t>(bits);
-            const auto now = wave || boardEnd ? boardNow : track->second;
+            const auto now = wave || boardEnd || plantEnd ? boardNow : track->second;
             std::int64_t result;
-            if ((blend || boardEnd) && value == 0) result = 0;
+            if ((blend || boardEnd || plantEnd) && value == 0) result = 0;
             else if (encode)
             {
                 if ((now > 0 && value > INT64_MAX-now) || (now < 0 && value < INT64_MIN-now))
@@ -1929,7 +1941,21 @@ ArraySnapshot ReadArray(
         }
         if (aSlot.mID & DATA_ARRAY_KEY_MASK)
         {
-            if (aV7Size) V7SaveSchema::Validate(theDescriptor.mKind, aSlot.mV7State);
+            if (aV7Size)
+            {
+                if (theFormat == Format::Dat64V5 && theDescriptor.mKind == RecordKind::Reanimation)
+                {
+                    auto validation = aSlot.mV7State;
+                    const auto start=static_cast<std::int64_t>(V7SaveSchema::Read(validation,4,8));
+                    const auto age=static_cast<std::int64_t>(V7SaveSchema::Read(validation,64,8));
+                    const auto period=static_cast<std::int64_t>(V7SaveSchema::Read(validation,16,8));
+                    if (age<0 || age>=period || (start>0 && age>INT64_MAX-start))
+                        Fail("v5 keyframe remainder is invalid");
+                    V7SaveSchema::Write(validation,64,static_cast<std::uint64_t>(start+age),8);
+                    V7SaveSchema::Validate(theDescriptor.mKind,validation);
+                }
+                else V7SaveSchema::Validate(theDescriptor.mKind,aSlot.mV7State);
+            }
             if (theDescriptor.mKind == RecordKind::Zombie &&
                 aSlotSize == LEGACY_ZOMBIE_SLOT_SIZE_PRE_MIGRATION)
             {
@@ -2974,9 +3000,9 @@ std::vector<Byte> WriteFileImage(
         // v1 exports retain a CRC for older readers; v2/v4 reserve the slot
         // as zero. No version requires a matching CRC on input.
         aFile.U32(theFormat == Format::Dat64V1 ? Crc32(aPayload) : 0);
-        aFile.U32(theFormat == Format::Dat64V5 ? 0x00010746U : theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_SCHEMA_ID :
+        aFile.U32(theFormat == Format::Dat64V5 ? 0x00010747U : theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_SCHEMA_ID :
             theFormat == Format::Dat64V2 ? LevelSaveFormat::DAT64_V2_SCHEMA_ID : LevelSaveFormat::DAT64_V1_SCHEMA_ID);
-        aFile.U32(theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_MINOR_VERSION : 0);
+        aFile.U32(theFormat == Format::Dat64V5 ? 1 : theFormat == Format::Dat64V4 ? LevelSaveFormat::DAT64_MINOR_VERSION : 0);
         aFile.U32(0);
         if (aFile.Position() != LevelSaveFormat::DAT64_HEADER_SIZE)
         {

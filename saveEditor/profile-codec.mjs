@@ -40,7 +40,7 @@ export function patchProfile(original,patch){
  if('coins'in patch){integer(patch.coins,0,999990,'金币');require(patch.coins%10===0,'金币需为 10 的倍数');v.setInt32(16,patch.coins/10,true)}
  if('finished'in patch)v.setInt32(20,integer(patch.finished,0,2147483647,'冒险通关次数'),true);
  if(patch.records){require(Array.isArray(patch.records)&&patch.records.length===100,'挑战记录数组无效');patch.records.forEach((value,i)=>v.setInt32(24+i*4,integer(value,0,2147483647,'挑战记录'),true));for(let i=0;i<20;i++)if(patch.records[i+1]!==previous.getInt32(24+(i+1)*4,true))v.setUint8(mini+i,patch.records[i+1]>0?1:0)}
- if(patch.purchases){require(Array.isArray(patch.purchases)&&patch.purchases.length===80,'商店记录数组无效');patch.purchases.forEach((value,i)=>v.setInt32(424+i*4,integer(value,0,2147483647,'购买记录'),true))}
+ if(patch.purchases){require(Array.isArray(patch.purchases)&&patch.purchases.length===80,'商店记录数组无效');patch.purchases.forEach((value,i)=>{if(i===21){require(Number.isInteger(value),'额外卡槽次数必须为整数');value=Math.max(0,Math.min(4,value))}v.setInt32(424+i*4,integer(value,0,2147483647,'购买记录'),true)})}
  if(patch.unlocks){require(Array.isArray(patch.unlocks)&&patch.unlocks.length===3,'解锁状态无效');[8,9,14].forEach((field,i)=>v.setInt32(744+field*4,patch.unlocks[i]?1:0,true))}
  if(patch.achievements){require(Array.isArray(patch.achievements)&&patch.achievements.length===20,'成就状态无效');patch.achievements.forEach((earned,i)=>{if(!!earned===(v.getUint8(achievements+i*2)!==0))return;v.setUint8(achievements+i*2,earned?1:0);v.setUint8(achievements+i*2+1,earned?1:0)})}
  return bytes;

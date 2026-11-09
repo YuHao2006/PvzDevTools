@@ -1,6 +1,6 @@
 // Inserted inside editor.js's closure by build-save-editor.mjs.
 let users=[];
-const shopNames=['机枪射手','双子向日葵','忧郁菇','香蒲','冰西瓜','吸金磁','地刺王','玉米加农炮','模仿者','额外小推车（存档值）','金盏花 1','金盏花 2','金盏花 3','金浇水壶','肥料','杀虫剂','留声机','园艺手套','蘑菇园','手推车','蜗牛','额外卡槽次数','泳池清理车','屋顶清理车','钉耙次数','水族馆','巧克力','智慧树','树肥','坚果包扎术'];
+const shopNames=['机枪射手','双子向日葵','忧郁菇','香蒲','冰西瓜','吸金磁','地刺王','玉米加农炮','模仿者','额外小推车（存档值）','金盏花 1','金盏花 2','金盏花 3','金浇水壶','肥料','杀虫剂','留声机','园艺手套','蘑菇园','手推车','蜗牛','额外卡槽次数（0～4，对应 6～10 卡槽）','泳池清理车','屋顶清理车','钉耙次数','水族馆','巧克力','智慧树','树肥','坚果包扎术'];
 function selectedUser(){const user=users.find(p=>p.id===Number($('user-list').value));if(!user)throw Error('请先新增或选择一个用户');return user}
 function inputField(parent,label,value,type='number',attributes={}){const wrap=document.createElement('label');wrap.append(document.createTextNode(label));const input=document.createElement('input');input.type=type;if(type==='checkbox')input.checked=!!value;else input.value=value;Object.assign(input,attributes);wrap.append(input);parent.append(wrap);return input}
 function loadProfiles(rows){users=rows||[];const selected=Number($('user-list').value);$('user-list').replaceChildren(...users.map(p=>new Option(p.name+' · ID '+p.id,p.id)));if(users.some(p=>p.id===selected))$('user-list').value=selected;showUser()}

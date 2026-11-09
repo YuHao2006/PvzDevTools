@@ -34,3 +34,20 @@ assert.equal(new Set(store.rows().map(p=>p.name.toLowerCase())).size,store.rows(
 const altered=perfectProfile();altered[12]=50;assert.deepEqual(perfectProfile(),completed);
 assert.equal(decodeProfile(newProfile()).finished,0);
 console.log('perfect-user creation: distributed preset, independent bytes, unique IDs/names and existing saves preserved');
+
+// HTML input bounds are advisory: validate the actual save operation too.
+for(const count of [0,1,2,3,4]) {
+ const purchases=decodeProfile(empty).purchases;purchases[21]=count;
+ assert.equal(decodeProfile(patchProfile(empty,{purchases})).purchases[21],count);
+}
+for(const count of [-1,5,10,2147483647]) {
+ const purchases=decodeProfile(empty).purchases;purchases[21]=count;
+ const original=empty.slice();
+ assert.equal(decodeProfile(patchProfile(empty,{purchases})).purchases[21],Math.max(0,Math.min(4,count)));
+ assert.deepEqual(empty,original,'clamping must not mutate the original profile');
+}
+for(const count of [NaN,Infinity,2.5]) {
+ const purchases=decodeProfile(empty).purchases;purchases[21]=count;
+ assert.throws(()=>patchProfile(empty,{purchases}),/额外卡槽次数/);
+}
+console.log('seed-bank purchase bounds: valid counts preserved, out-of-range integers clamped, non-integers rejected');

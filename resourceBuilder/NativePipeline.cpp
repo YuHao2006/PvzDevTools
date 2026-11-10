@@ -283,7 +283,19 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
     Json sceneInput = Json::array();
     for (auto &source : config.sources.at("scene"))
         sceneInput.push_back(SceneParse(Text(source)));
-    sceneInput.push_back(CommonUI());
+    auto commonUI=CommonUI();
+    const auto hdManifest=root/"assets/high-resolution/images.json";
+    if(fs::exists(hdManifest))
+    {
+        const auto cards=ReadJson(hdManifest).value("cards",Json::object());
+        for(const auto &[id,image]:cards.items())
+        {
+            Require(std::stoul(id)<53,"Unsupported high-resolution seed card");
+            commonUI["sprites"].push_back({{"name","SEED_CARD_"+id},{"image",image},
+                                           {"logical_size",{50,70}},{"scale",1.0}});
+        }
+    }
+    sceneInput.push_back(commonUI);
     std::map<std::string, ImageDescriptor> sourceImages;
     auto scenes = PrepareScenes(sceneInput, author, rawFiles, sourceImages);
     Require(scenes.size() == 6, "Production build needs all six scene modules");

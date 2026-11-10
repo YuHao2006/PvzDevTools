@@ -27,7 +27,9 @@ int main(int argc, char **argv)
         ImageDescriptor descriptor;
         descriptor.path = "images/test";
         descriptor.cols = 3;
-        std::map<std::string, ImageDescriptor> descriptors{{"TEST", descriptor}};
+        ImageDescriptor program;
+        program.flags=1;
+        std::map<std::string, ImageDescriptor> descriptors{{"TEST", descriptor},{"PROGRAM",program}};
         ApplyHighResolutionImages(root, descriptors);
         const auto image = DecodeImage(descriptors.at("TEST"), {{"images/test.png", root / "original/image.png"}});
         Require(image.width == 48 && image.height == 32 && image.logicalWidth == 12 && image.logicalHeight == 8,
@@ -55,6 +57,11 @@ int main(int argc, char **argv)
         auto legacy = DecodeImage(descriptor, {{"images/test.png", root / "original/image.png"}});
         Require(legacy.logicalWidth == 12 && legacy.logicalHeight == 8 && legacy.width == 12,
                 "Image without an HD replacement changed");
+        descriptor.logicalWidth=6;
+        descriptor.logicalHeight=4;
+        auto direct=DecodeImage(descriptor,{{"images/test.png",root/"original/image.png"}});
+        Require(direct.width==12 && direct.height==8 && direct.logicalWidth==6 && direct.logicalHeight==4,
+                "Direct atlas source ignored its logical dimensions");
         std::cout << "High-resolution logical extents, sprite cells, UV and alpha verified\n";
         return 0;
     }

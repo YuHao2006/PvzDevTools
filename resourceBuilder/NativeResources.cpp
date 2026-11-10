@@ -61,6 +61,10 @@ Bytes Payload(const Json &groups)
 ResourcePlan CompileResources(const fs::path &root, const Json &author,
                               const std::map<std::string, unsigned> &tags)
 {
+    Json highResolution;
+    const auto hdManifest = root / "assets/high-resolution/images.json";
+    if (fs::exists(hdManifest))
+        highResolution = ReadJson(hdManifest);
     Require(author.is_object() && author.size() == 2 &&
                 author.value("format", "") == "pvz-resources-authoring-v1",
             "Invalid author manifest format");
@@ -234,6 +238,21 @@ ResourcePlan CompileResources(const fs::path &root, const Json &author,
                     Word(details, tags.at(t));
                 }
                 localFonts[name] = unsigned(plan["records"].size());
+            }
+            if (kind == 0 && !path.empty() && !highResolution.is_null() &&
+                highResolution.at("images").contains(Key(path)))
+            {
+                const auto key = Key(path);
+                const auto &logical = highResolution.at("logicalSizes").at(key);
+                Require(logical[0].get<int>() > 0 && logical[1].get<int>() > 0,
+                        "Invalid high-resolution logical dimensions");
+                path = "high-resolution/" + highResolution["images"][key].get<std::string>();
+                paths[0] = path;
+                paths[1].clear();
+                paths[2].clear();
+                flags = (flags & ~1024u) | 16384u;
+                Word(details, logical[0].get<unsigned>());
+                Word(details, logical[1].get<unsigned>());
             }
             Bytes pathData;
             for (auto &p : paths)

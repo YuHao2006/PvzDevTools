@@ -280,6 +280,11 @@ Image DecodeImage(const ImageDescriptor &d, const Files &files)
                                    3] = mask.rgba[(std::size_t(y) * mask.width + x) * 4 + 2];
         image.files.insert(mask.files.begin(), mask.files.end());
     }
+    if(d.logicalWidth && d.logicalHeight)
+    {
+        image.logicalWidth=d.logicalWidth;
+        image.logicalHeight=d.logicalHeight;
+    }
     if (!d.highResolution.empty())
     {
         // Replacement PNGs already include their alpha. Applying the old alpha image
@@ -289,8 +294,8 @@ Image DecodeImage(const ImageDescriptor &d, const Files &files)
                 "High-resolution replacement is smaller than its logical canvas: " + d.path);
         Require(replacement.width % d.cols == 0 && replacement.height % d.rows == 0,
                 "High-resolution replacement does not preserve the image grid: " + d.path);
-        replacement.logicalWidth = image.width;
-        replacement.logicalHeight = image.height;
+        replacement.logicalWidth = image.logicalWidth;
+        replacement.logicalHeight = image.logicalHeight;
         replacement.files = std::move(image.files);
         image = std::move(replacement);
     }
@@ -307,6 +312,8 @@ void ApplyHighResolutionImages(const fs::path &root, std::map<std::string, Image
     const auto directory = fs::weakly_canonical(root / "assets/high-resolution");
     for (auto &[name, descriptor] : descriptors)
     {
+        if (descriptor.path.empty() || (descriptor.flags & (1u | 8192u)))
+            continue;
         auto key = Key(descriptor.path);
         if (!document.at("images").contains(key))
             continue;

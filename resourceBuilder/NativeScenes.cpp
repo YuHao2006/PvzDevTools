@@ -198,7 +198,7 @@ Json PrepareScenes(Json documents, const Json &author, const Files &files,
         if (!d.path.empty())
             paths[Key(d.path)].push_back(d);
     auto recipe = [](const ImageDescriptor &d) {
-        return std::make_tuple(d.path, d.alpha, d.alphaGrid, d.flags, d.color);
+        return std::make_tuple(d.path, d.alpha, d.alphaGrid, d.flags, d.color,d.logicalWidth,d.logicalHeight);
     };
     Json result = Json::object();
     for (auto &document : documents)
@@ -232,6 +232,12 @@ Json PrepareScenes(Json documents, const Json &author, const Files &files,
                     d.path = image;
                     d.flags = 1024;
                 }
+            }
+            if(row.contains("logical_size"))
+            {
+                d.logicalWidth=row["logical_size"][0].get<unsigned>();
+                d.logicalHeight=row["logical_size"][1].get<unsigned>();
+                Require(d.logicalWidth && d.logicalHeight,"Invalid scene logical size");
             }
             Require(!(d.flags & (1 | 8192)) && (d.alphaGrid.empty() || (d.rows == 1 && d.cols == 1)),
                     "Unavailable scene source");
@@ -330,6 +336,21 @@ Records GenerateScenes(const Json &reports)
         for (auto &row : rows)
             cpp += "    " + Region(row["region"], width, height) + ",\n";
         cpp += "};\n";
+        if(module=="CommonUI")
+        {
+            std::map<unsigned,Json> cards;
+            for(const auto &row:rows)
+            {
+                const auto name=row["name"].get<std::string>();
+                if(name.starts_with("SEED_CARD_"))cards[std::stoul(name.substr(10))]=row["region"];
+            }
+            header+="inline constexpr bool HasSeedCards="+std::string(cards.empty()?"false":"true")+";\n";
+            header+="extern const Sexy::TextureRegion SeedCards[53];\n";
+            cpp+="const Sexy::TextureRegion SeedCards[53] = {\n";
+            for(unsigned i=0;i<53;++i)
+                cpp+="    "+Region(cards.contains(i)?cards.at(i):Json{0,0,0,0},width,height)+",\n";
+            cpp+="};\n";
+        }
         if (module == "Achievements")
         {
             std::map<unsigned, Json> icons;

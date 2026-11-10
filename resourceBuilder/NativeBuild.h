@@ -106,6 +106,7 @@ struct ImageDescriptor
 {
     std::string path, alpha, alphaGrid;
     fs::path highResolution;
+    unsigned logicalWidth=0, logicalHeight=0;
     unsigned flags = 0, rows = 1, cols = 1, color = 0xffffff;
 };
 struct Image

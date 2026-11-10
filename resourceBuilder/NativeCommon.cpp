@@ -532,6 +532,29 @@ Files Inventory(const fs::path &root)
                 "Invalid AI overlay source");
         Require(out.emplace(Key(name), source).second, "AI overlay duplicates source");
     }
+    const auto highResolution = root / "assets/high-resolution/images.json";
+    if (fs::exists(highResolution))
+    {
+        const auto manifest = ReadJson(highResolution);
+        Require(manifest.at("format") == "pvz-high-resolution-images-v1", "Invalid high-resolution manifest");
+        const auto directory = fs::canonical(highResolution.parent_path());
+        for (const auto &value : manifest.at("images"))
+        {
+            const auto source = fs::canonical(directory / value.get<std::string>());
+            const auto relative = source.lexically_relative(directory);
+            Require(!relative.empty() && *relative.begin() != "..", "High-resolution source escapes root");
+            out.try_emplace(Key("high-resolution/" + relative.generic_string()), source);
+        }
+        for(const auto &value:manifest.value("cards",Json::object()))
+        {
+            const auto name=value.get<std::string>();
+            Require(name.starts_with("high-resolution/"),"Invalid card image path");
+            const auto source=fs::canonical(directory/name.substr(std::string("high-resolution/").size()));
+            const auto relative=source.lexically_relative(directory);
+            Require(!relative.empty() && *relative.begin()!="..", "Card image escapes high-resolution root");
+            out.try_emplace(Key(name),source);
+        }
+    }
     return out;
 }
 } // namespace pvz::build

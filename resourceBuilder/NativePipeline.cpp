@@ -339,6 +339,39 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         sourceImages[name] = d;
     }
     ApplyHighResolutionImages(root, sourceImages);
+    // Resolution is an offline asset policy. A deferred module can share source
+    // art with a completed module without forcing either module's texture size.
+    std::map<std::string,std::map<unsigned,std::string>> originalDefinitionNames;
+    if(fs::exists(hdManifest))
+    {
+        const auto deferred=ReadJson(hdManifest).value("originalDefinitions",std::set<std::string>{});
+        for(auto &[rootName,metadata]:reanimMetadata.items())
+        {
+            if(!deferred.contains(Lower(rootName)))continue;
+            std::map<std::string,std::string> aliases;
+            for(auto &variant:metadata["variants"])
+            {
+                for(auto &track:variant["images"])
+                    for(auto &image:track)
+                    {
+                        if(image.is_null())continue;
+                        const auto original=image.get<std::string>();
+                        const auto alias="ORIGINAL_RESOLUTION_"+original;
+                        auto descriptor=sourceImages.at(original);
+                        descriptor.highResolution.clear();
+                        sourceImages[alias]=descriptor;
+                        aliases[original]=alias;
+                        image=alias;
+                    }
+                const auto member="compiled/reanim/"+Lower(variant["name"].get<std::string>())+".compiled";
+                virtualVariants[member]["variant"]=variant;
+            }
+            auto names=sourceNames.at("reanim");
+            for(auto &[id,symbol]:names)
+                if(aliases.contains(symbol))symbol=aliases.at(symbol);
+            originalDefinitionNames[rootName]=std::move(names);
+        }
+    }
     const std::string projectilePath = "compiled/projectiles/projectiles.compiled",
                       zombatarPath = "compiled/zombatar/zombatar.compiled";
     records[projectilePath] = {};
@@ -570,7 +603,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             rows.push_back(variantReports.at(member));
         }
         auto result = ReanimVariants(records.at(name), metadata, variants, actions.value(rootName, Json()),
-                                     sourceNames.at("reanim"), sourceImages);
+                                     originalDefinitionNames.contains(rootName)?originalDefinitionNames.at(rootName):sourceNames.at("reanim"), sourceImages);
         records[name] = std::move(result.bytes);
         auto report = rows[0];
         report.update(result.atlas);

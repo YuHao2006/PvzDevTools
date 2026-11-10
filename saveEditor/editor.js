@@ -15,7 +15,7 @@ window.addEventListener('message',event=>{
  if(event.source!==parent||event.origin!==origin||event.data?.channel!==channel)return;
  const data=event.data;
  if(data.op==='init'){
-  host=true;document.querySelector('main').inert=false;document.querySelector('nav').inert=false;loadProfiles(data.payload.profiles);presets=data.payload.presets;custom=data.payload.custom||[];fillSaves(data.payload.saves);if(!initialized){setModel(data.payload.lineup);$('code').value=data.payload.code;initialized=true}fillPresets();tab('profile');status('已打开。修改游戏存档前可先导出 DAT64 备份。');return;
+  host=true;document.documentElement.toggleAttribute('data-game-host',data.payload.gameHost===true);document.querySelector('main').inert=false;document.querySelector('nav').inert=false;loadProfiles(data.payload.profiles);presets=data.payload.presets;custom=data.payload.custom||[];fillSaves(data.payload.saves);if(!initialized){setModel(data.payload.lineup);$('code').value=data.payload.code;initialized=true}fillPresets();tab('profile');status(data.payload.gameHost?'已打开。存档导入、导出与修复在游戏启动页的“高级”中。':'已打开。修改游戏存档前可先导出 DAT64 备份。');return;
  }
  const item=pending.get(data.id);if(!item)return;pending.delete(data.id);clearTimeout(item.timer);data.error?item.reject(Error(data.error)):item.resolve(data.result);
 });

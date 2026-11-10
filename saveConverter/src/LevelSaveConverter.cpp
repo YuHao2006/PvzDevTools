@@ -3892,6 +3892,60 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
     return repairs;
 }
 
+bool RepairSurvivalTransition(const std::filesystem::path& input,
+    const std::filesystem::path& output, int mode)
+{
+    const auto sourcePath = std::filesystem::absolute(input).lexically_normal();
+    if (output.empty() || std::filesystem::exists(output) ||
+        sourcePath == std::filesystem::absolute(output).lexically_normal())
+        Fail("Repair requires a new output file; existing files are never overwritten");
+    const auto format = DetectFormat(sourcePath);
+    if (!HasV7State(format)) Fail("Survival repair supports DAT64 v4/v5 only");
+    const auto source = ReadFileFully(sourcePath);
+    std::uint32_t date = 0;
+    auto document = ParseDat64(source, date);
+    if (mode < GAME_MODE_SURVIVAL_FIRST || mode > GAME_MODE_SURVIVAL_LAST) return false;
+    const auto& board = document.mCanonicalBoard;
+    const auto stage = ReadI32At(document.mChallenge, 116);
+    const bool endless = mode >= GAMEMODE_SURVIVAL_ENDLESS_STAGE_1 && mode <= GAMEMODE_SURVIVAL_ENDLESS_STAGE_5;
+    if (!endless && stage >= 4) return false;
+    // Frozen canonical offsets, independent of the current game's class layout.
+    const auto waves = ReadI32At(board, 0x5400);
+    if (waves <= 0 || ReadI32At(board, 0x5418) != waves ||
+        board.at(0x5498) || !board.at(0x54a8)) return false;
+    const auto fields = Dat64TimeSchema::BoardFields();
+    const auto indexOf = [&](std::string_view name) {
+        for (std::size_t i = 0; i < fields.size(); ++i)
+            if (name == fields[i].mName) return i;
+        Fail("Survival checkpoint field missing");
+    };
+    const auto next = indexOf("mNextSurvivalStageCounter");
+    const auto ns = [&](std::string_view name) {
+        return std::bit_cast<std::int64_t>(document.mNanoseconds.at(indexOf(name)));
+    };
+    if (document.mNanoseconds.at(next) != 0 || ns("mBoardFadeOutCounter") >= 0 ||
+        ns("mZombieCountDown") > 0) return false;
+    const auto original = document;
+    // The normal update performs removal, stage advancement and chooser entry.
+    // Do not set mLevelComplete here: the Continue dialog must finish first.
+    document.mNanoseconds[next] = 1;
+    const auto before = WriteFileImage(original, format, date);
+    const auto after = WriteFileImage(document, format, date);
+    if (before.size() != source.size() || after.size() != source.size())
+        Fail("Survival repair unexpectedly changed the wire layout");
+    auto image = source;
+    for (std::size_t i = 0; i < image.size(); ++i)
+        if (before[i] != after[i]) {
+            if (source[i] != before[i]) Fail("Repair field differs from parsed representation");
+            image[i] = after[i];
+        }
+    std::uint32_t verifiedDate = 0;
+    if (ParseDat64(image, verifiedDate) != document)
+        Fail("Survival repair failed complete round-trip validation");
+    AtomicWrite(std::filesystem::absolute(output), image);
+    return true;
+}
+
 const char* UserFormatName(UserFormat theFormat)
 {
     return theFormat == UserFormat::LegacyUserDat

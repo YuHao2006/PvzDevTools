@@ -29,7 +29,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* pvz_inspect_save(const char* filenam
         const auto input = std::filesystem::path("/input") / name;
         // Inspect validates the complete document, including all pools and tails.
         resultMetadata = PvzDat64::InspectV4File(input, mode);
-        if (repair) {
+        if (repair == 2) {
+            const auto output = std::filesystem::path("/output") / name;
+            const bool changed = PvzDat64::RepairSurvivalTransition(input, output, mode);
+            resultMetadata = changed ? "{\"survivalTransitionRepaired\":true}" :
+                "{\"survivalTransitionRepaired\":false}";
+            if (changed) resultName = name.string();
+        } else if (repair) {
             const auto output = std::filesystem::path("/output") / name;
             const auto repairs = PvzDat64::RepairPlantAttacks(input, output);
             std::ostringstream metadata;

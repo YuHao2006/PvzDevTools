@@ -34,8 +34,9 @@ onmessage=async({data})=>{
     else postMessage({unchanged:true});
     return;
    }
-   if(!['extract','validate','repair-plant-attacks'].includes(op))throw Error('独立存档工具暂不支持此操作：'+op);
-   const error=module.ccall('pvz_inspect_save','string',['string','number','number'],[data.name,mode,+(op==='repair-plant-attacks')]);
+   if(!['extract','validate','repair-plant-attacks','repair-survival-transition'].includes(op))throw Error('独立存档工具暂不支持此操作：'+op);
+   const repair=op==='repair-survival-transition'?2:+(op==='repair-plant-attacks');
+   const error=module.ccall('pvz_inspect_save','string',['string','number','number'],[data.name,mode,repair]);
    if(error)throw Error(error);
    const metadata=JSON.parse(module.ccall('pvz_save_metadata','string',[],[]));
    const name=module.ccall('pvz_conversion_output_name','string',[],[]);

@@ -3,7 +3,7 @@
 let worker, pending=false;
 export async function runIndependentSaveTool(request,input,profile){
  if(pending)throw Error('离线存档工具正在处理上一项任务');
- if(!['generate','extract','validate','repair-plant-attacks','dfu'].includes(request?.op))throw Error('独立存档工具尚未实现此操作：'+request?.op);
+ if(!['generate','extract','validate','repair-plant-attacks','repair-survival-transition','dfu'].includes(request?.op))throw Error('独立存档工具尚未实现此操作：'+request?.op);
  const mode=request.mode??58;
  if(!Number.isInteger(mode)||mode<0||mode>72)throw Error('关卡模式无效');
  if(request.op!=='generate'&&!(input instanceof Uint8Array))throw Error('缺少 DAT64 存档数据');

@@ -43,6 +43,11 @@ std::vector<PlantAttackRepair> RepairPlantAttacks(
     const std::filesystem::path& input,
     const std::filesystem::path& output = {});
 
+// Offline, narrowly recognized survival repick checkpoint saved at zero before
+// completion was committed. Restore one ns of pending completion, not a new wave.
+bool RepairSurvivalTransition(const std::filesystem::path& input,
+    const std::filesystem::path& output, int mode);
+
 // Validates the complete frozen v4 document before returning editor metadata.
 // No game classes, definitions, graphics, audio or resource package are loaded.
 std::string InspectV4File(const std::filesystem::path& input, int mode);

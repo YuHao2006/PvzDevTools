@@ -135,6 +135,8 @@ Definition CompileDefinition(std::string_view name, const Bytes &source, const J
         rows.push_back({{"source", symbol},
                         {"width", image.width},
                         {"height", image.height},
+                        {"logical_width", image.logicalWidth},
+                        {"logical_height", image.logicalHeight},
                         {"rows", d.rows},
                         {"cols", d.cols},
                         {"rgba_bytes", image.rgba.size()},

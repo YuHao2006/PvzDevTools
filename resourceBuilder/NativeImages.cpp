@@ -156,6 +156,8 @@ Image ReadImage(const std::string &path, const Files &files, bool automatic = tr
         image.files.insert(mask.files.begin(), mask.files.end());
     }
     Require(!image.rgba.empty(), "Definition image missing: " + path);
+    image.logicalWidth = image.width;
+    image.logicalHeight = image.height;
     return image;
 }
 } // namespace
@@ -278,7 +280,42 @@ Image DecodeImage(const ImageDescriptor &d, const Files &files)
                                    3] = mask.rgba[(std::size_t(y) * mask.width + x) * 4 + 2];
         image.files.insert(mask.files.begin(), mask.files.end());
     }
+    if (!d.highResolution.empty())
+    {
+        // Replacement PNGs already include their alpha. Applying the old alpha image
+        // would either reject the new extent or destroy the high-resolution edge.
+        auto replacement = Decode(d.highResolution);
+        Require(replacement.width >= image.width && replacement.height >= image.height,
+                "High-resolution replacement is smaller than its logical canvas: " + d.path);
+        Require(replacement.width % d.cols == 0 && replacement.height % d.rows == 0,
+                "High-resolution replacement does not preserve the image grid: " + d.path);
+        replacement.logicalWidth = image.width;
+        replacement.logicalHeight = image.height;
+        replacement.files = std::move(image.files);
+        image = std::move(replacement);
+    }
     return image;
+}
+
+void ApplyHighResolutionImages(const fs::path &root, std::map<std::string, ImageDescriptor> &descriptors)
+{
+    const auto manifest = root / "assets/high-resolution/images.json";
+    if (!fs::exists(manifest))
+        return;
+    const auto document = ReadJson(manifest);
+    Require(document.at("format") == "pvz-high-resolution-images-v1", "Invalid high-resolution image manifest");
+    const auto directory = fs::weakly_canonical(root / "assets/high-resolution");
+    for (auto &[name, descriptor] : descriptors)
+    {
+        auto key = Key(descriptor.path);
+        if (!document.at("images").contains(key))
+            continue;
+        const auto path = fs::weakly_canonical(directory / document["images"][key].get<std::string>());
+        const auto relative = path.lexically_relative(directory);
+        Require(!relative.empty() && *relative.begin() != ".." && fs::is_regular_file(path),
+                "High-resolution image must be a file inside assets/high-resolution: " + key);
+        descriptor.highResolution = path;
+    }
 }
 
 Bytes EncodePng(const Image &image)

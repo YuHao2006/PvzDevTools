@@ -293,10 +293,30 @@ std::string CppFloat(double v)
 }
 std::string Region(const Json &r, int w, int h)
 {
-    int x = r[0], y = r[1], a = r[2], b = r[3];
+    double x = r[0], y = r[1], a = r[2], b = r[3];
+    int logicalWidth = r.size() == 6 ? r[4].get<int>() : int(a);
+    int logicalHeight = r.size() == 6 ? r[5].get<int>() : int(b);
     return "{" + CppFloat(w ? double(x) / w : 0) + ", " + CppFloat(h ? double(y) / h : 0) + ", " +
            CppFloat(w ? double(x + a) / w : 0) + ", " + CppFloat(h ? double(y + b) / h : 0) + ", " +
-           std::to_string(a) + ", " + std::to_string(b) + "}";
+           std::to_string(logicalWidth) + ", " + std::to_string(logicalHeight) + "}";
+}
+Json DrawingRegion(const Json &rect, const Json &report)
+{
+    if (rect[2] == 0 || rect[3] == 0)
+        return rect;
+    for (const auto &image : report.at("images"))
+    {
+        const auto &source = image.at("region");
+        double x = source[0], y = source[1], w = source[2], h = source[3];
+        double rx = rect[0], ry = rect[1], rw = rect[2], rh = rect[3];
+        if (rx < x || ry < y || rx + rw > x + w || ry + rh > y + h)
+            continue;
+        int lw = image.value("logical_width", image["width"].get<int>());
+        int lh = image.value("logical_height", image["height"].get<int>());
+        return Json{rx, ry, rw, rh, int(std::lround(rw * lw / w)), int(std::lround(rh * lh / h))};
+    }
+    Require(false, "Drawing rectangle has no source image");
+    return rect;
 }
 Bytes Envelope(unsigned cookie, const Bytes &payload)
 {

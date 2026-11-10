@@ -278,12 +278,15 @@ Json CompileScene(const Json &document, const Json &layout, const std::vector<st
     {
         auto source = row["source"].get<std::string>();
         const auto &image = images.at(source);
-        auto rect = row.value("rect", Json{0, 0, image.width, image.height});
+        auto rect = row.value("rect", Json{0, 0, image.logicalWidth, image.logicalHeight});
         int x = rect[0], y = rect[1], w = rect[2], h = rect[3];
-        Require(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= int(image.width) && y + h <= int(image.height),
+        Require(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= int(image.logicalWidth) && y + h <= int(image.logicalHeight),
                 "Scene sprite outside source " + row["name"].get<std::string>());
         row["source_rect"] = rect;
-        row["region"] = {regions.at(source)[0].get<int>() + x, regions.at(source)[1].get<int>() + y, w, h};
+        const double sx = double(image.width) / image.logicalWidth;
+        const double sy = double(image.height) / image.logicalHeight;
+        row["region"] = {regions.at(source)[0].get<int>() + x * sx,
+                         regions.at(source)[1].get<int>() + y * sy, w * sx, h * sy, w, h};
         sprites.push_back(row);
     }
     return {{"name", document["name"]},
@@ -442,7 +445,8 @@ Records GenerateZombatar(const Json &document, const Json &report)
     return FilesFrom({{"ZombatarImage.h", header}, {"ZombatarAtlasData.cpp", cpp}});
 }
 
-Bytes CompileProjectiles(const Json &document, const Json &layout, const std::vector<std::string> &symbols)
+Bytes CompileProjectiles(const Json &document, const Json &layout, const std::vector<std::string> &symbols,
+                         const std::map<std::string, Image> &images)
 {
     Require(document["format"] == "pvz-projectile-sources-v1" && document["projectiles"].size() == 14 &&
                 document["shadows"].size() == 2,
@@ -466,13 +470,14 @@ Bytes CompileProjectiles(const Json &document, const Json &layout, const std::ve
     for (auto &row : document["shadows"])
     {
         auto r = regions.at(row["image"].get<std::string>()), rect = row["rect"];
+        const auto &image = images.at(row["image"].get<std::string>());
         int x = rect[0], y = rect[1], w = rect[2], h = rect[3];
-        Require(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= r[2].get<int>() && y + h <= r[3].get<int>(),
+        Require(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= int(image.logicalWidth) && y + h <= int(image.logicalHeight),
                 "Projectile shadow outside source");
-        Integer(bytes, r[0].get<int>() + x);
-        Integer(bytes, r[1].get<int>() + y);
-        Integer(bytes, w);
-        Integer(bytes, h);
+        Integer(bytes, r[0].get<int>() + int(x * 1ULL * image.width / image.logicalWidth));
+        Integer(bytes, r[1].get<int>() + int(y * 1ULL * image.height / image.logicalHeight));
+        Integer(bytes, int(w * 1ULL * image.width / image.logicalWidth));
+        Integer(bytes, int(h * 1ULL * image.height / image.logicalHeight));
     }
     return bytes;
 }

@@ -59,6 +59,8 @@ Json GeometryReport(const std::vector<std::string> &symbols, const Json &layout,
         rows.push_back({{"source", symbol},
                         {"width", image.width},
                         {"height", image.height},
+                        {"logical_width", image.logicalWidth},
+                        {"logical_height", image.logicalHeight},
                         {"rows", d.rows},
                         {"cols", d.cols},
                         {"rgba_bytes", image.rgba.size()},
@@ -324,6 +326,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         d.flags = row["auto_alpha"].get<bool>() ? 1024 : 0;
         sourceImages[name] = d;
     }
+    ApplyHighResolutionImages(root, sourceImages);
     const std::string projectilePath = "compiled/projectiles/projectiles.compiled",
                       zombatarPath = "compiled/zombatar/zombatar.compiled";
     records[projectilePath] = {};
@@ -512,7 +515,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
                         report["images"][i]["name"] = zombatar["images"][i]["name"];
                 else
                 {
-                    records[name] = CompileProjectiles(projectiles, layout, unit.symbols);
+                    records[name] = CompileProjectiles(projectiles, layout, unit.symbols, images);
                     Reader p(records[name]);
                     p.Skip(20);
                     Json rows = Json::array(), shadows = Json::array();

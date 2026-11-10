@@ -27,6 +27,15 @@ add_executable(pvz-resource-build
 target_compile_features(pvz-resource-build PRIVATE cxx_std_23)
 target_compile_options(pvz-resource-build PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 target_link_libraries(pvz-resource-build PRIVATE ZLIB::ZLIB nlohmann_json::nlohmann_json spng::spng_static libjpeg-turbo::jpeg-static ortools::ortools)
+if(BUILD_TESTING)
+    add_executable(pvz-resource-image-test tests/resource-image-geometry.cpp
+        resourceBuilder/NativeCommon.cpp resourceBuilder/NativeImages.cpp resourceBuilder/NativeScenes.cpp)
+    target_include_directories(pvz-resource-image-test PRIVATE resourceBuilder)
+    target_compile_features(pvz-resource-image-test PRIVATE cxx_std_23)
+    target_compile_options(pvz-resource-image-test PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    target_link_libraries(pvz-resource-image-test PRIVATE ZLIB::ZLIB nlohmann_json::nlohmann_json spng::spng_static libjpeg-turbo::jpeg-static)
+    add_test(NAME high-resolution-image-geometry COMMAND pvz-resource-image-test "${CMAKE_CURRENT_BINARY_DIR}/hd-image-test")
+endif()
 if(WIN32)
     add_custom_command(TARGET pvz-resource-build POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:pvz-resource-build> $<TARGET_FILE_DIR:pvz-resource-build>

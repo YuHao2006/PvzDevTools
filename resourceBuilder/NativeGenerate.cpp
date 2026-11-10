@@ -341,14 +341,15 @@ Bytes ParticleRecord(const Bytes &source, const Json &reports, unsigned names, u
         Word(out, w);
         Word(out, h);
         String(out, reports[v]["atlas_path"].get<std::string>());
-        for (auto &rect : atlas["variant_rectangles"][v])
+        for (auto &physicalRect : atlas["variant_rectangles"][v])
         {
+            auto rect = DrawingRegion(physicalRect, reports[v]);
             int x = rect[0], y = rect[1], a = rect[2], b = rect[3];
             for (double coordinate : {w ? double(x) / w : 0, h ? double(y) / h : 0, w ? double(x + a) / w : 0,
                                       h ? double(y + b) / h : 0})
                 Float(out, float(coordinate));
-            Integer(out, a);
-            Integer(out, b);
+            Integer(out, rect.size() == 6 ? rect[4].get<int>() : a);
+            Integer(out, rect.size() == 6 ? rect[5].get<int>() : b);
         }
     }
     summary["emitters"] = summary["emitters"].get<unsigned>() + emitters;
@@ -393,6 +394,7 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
     for (unsigned index = 0; index < rc; ++index)
     {
         const auto &definition = definitions[index];
+        const auto path = "compiled/reanim/" + Lower(reanimOrder[index].second) + ".compiled";
         const auto &atlas = definition.atlas;
         auto &code = shards[index % 8];
         auto prefix = "Reanim" + std::to_string(index);
@@ -438,7 +440,8 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         for (unsigned v = 0; v < variants; ++v)
             for (auto &rect : atlas["variant_rectangles"][v])
                 rectValues.push_back(
-                    Region(rect, atlas["variant_dimensions"][v][0], atlas["variant_dimensions"][v][1]));
+                    Region(DrawingRegion(rect, reports.at(path).at("variants").at(v)),
+                           atlas["variant_dimensions"][v][0], atlas["variant_dimensions"][v][1]));
         auto rects = emit("Sexy::TextureRegion", "Rects", rectValues, true);
         Lines transitionValues;
         for (auto &v : atlas["transitions"])
@@ -598,17 +601,18 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
     Require(projectile.Word() == 0x314a5250 && projectile.Word() == 1 && projectile.Word() == 14,
             "Invalid projectile record");
     unsigned pw = projectile.Word(), ph = projectile.Word();
+    const auto &projectileReport = reports.at("compiled/projectiles/projectiles.compiled");
     Lines visuals, shadows;
     for (unsigned i = 0; i < 14; ++i)
     {
         int x = projectile.Int(), y = projectile.Int(), w = projectile.Int(), h = projectile.Int();
         auto scale = projectile.Float();
-        visuals.push_back("{" + Region(Json{x, y, w, h}, pw, ph) + "," + CppFloat(scale) + "}");
+        visuals.push_back("{" + Region(DrawingRegion(Json{x, y, w, h}, projectileReport), pw, ph) + "," + CppFloat(scale) + "}");
     }
     for (unsigned i = 0; i < 2; ++i)
     {
         int x = projectile.Int(), y = projectile.Int(), w = projectile.Int(), h = projectile.Int();
-        shadows.push_back(Region(Json{x, y, w, h}, pw, ph));
+        shadows.push_back(Region(DrawingRegion(Json{x, y, w, h}, projectileReport), pw, ph));
     }
     projectile.Finish();
     objects.insert(objects.end(), {"constinit ProjectileAtlasDefinition Projectiles = {",

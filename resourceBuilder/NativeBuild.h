@@ -55,6 +55,7 @@ unsigned Crc(std::span<const unsigned char> data);
 std::string CppFloat(double value);
 std::string CppString(std::string_view value);
 std::string Region(const Json &rect, int width, int height);
+Json DrawingRegion(const Json &rect, const Json &report);
 void Run(const fs::path &executable, const std::vector<std::string> &args);
 void Zip(const fs::path &path, const Records &records);
 void Compact(const fs::path &source, const fs::path &output, std::string_view mode, unsigned workers = 2);
@@ -104,17 +105,20 @@ Records ResourceHeaders(const ResourcePlan &plan);
 struct ImageDescriptor
 {
     std::string path, alpha, alphaGrid;
+    fs::path highResolution;
     unsigned flags = 0, rows = 1, cols = 1, color = 0xffffff;
 };
 struct Image
 {
     unsigned width = 0, height = 0;
+    unsigned logicalWidth = 0, logicalHeight = 0;
     Bytes rgba;
     std::set<std::string> files;
 };
 std::map<std::string, ImageDescriptor> ImageDescriptors(const Json &author, const Files &files,
                                                         const std::set<std::string> &names);
 Image DecodeImage(const ImageDescriptor &descriptor, const Files &files);
+void ApplyHighResolutionImages(const fs::path &root, std::map<std::string, ImageDescriptor> &descriptors);
 Bytes EncodePng(const Image &image);
 Records PackFontImages(FontCorpus &corpus, const Files &files);
 Image PackImages(const std::vector<const Image *> &images, const Json &layout);
@@ -132,7 +136,8 @@ Records GenerateScenes(const Json &reports);
 Json CompileScene(const Json &document, const Json &layout, const std::vector<std::string> &symbols,
                   std::string_view atlasPath, const std::map<std::string, Image> &images);
 Records GenerateZombatar(const Json &document, const Json &report);
-Bytes CompileProjectiles(const Json &document, const Json &layout, const std::vector<std::string> &symbols);
+Bytes CompileProjectiles(const Json &document, const Json &layout, const std::vector<std::string> &symbols,
+                         const std::map<std::string, Image> &images);
 
 struct Definition
 {

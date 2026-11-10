@@ -1,6 +1,6 @@
-import assert from 'node:assert/strict';import fs from 'node:fs/promises';
-import {chromium} from 'file:///C:/Users/Administrator/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
-const R='C:/Users/Administrator/CLionProjects/codex/PlantsVsZombiesModern-v4.0.2',D='C:/Users/Administrator/CLionProjects/codex/PvzDevTools';
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {fileURLToPath} from 'node:url';
+const {chromium}=await import(process.env.PVZ_PLAYWRIGHT_MODULE||'playwright-core');
+const D=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),R=path.resolve(process.argv[2]||path.join(D,'../PlantsVsZombiesModern'));
 const input=await fs.readFile(R+'/out/verification/endless-user-stuck/game1_58.dat64');
 const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
 try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));

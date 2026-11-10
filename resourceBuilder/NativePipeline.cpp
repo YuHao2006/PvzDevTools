@@ -494,7 +494,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             layouts[index] = ExactLayout(batches[index], layouts[index], unit.settings,
                                          cache / "atlas-layout-cache", definitions / "atlas-cache");
             const auto &exact = layouts[index]["exact"];
-            Require(exact["optimal"].get<bool>() ||
+            Require(unit.settings.fast || exact["optimal"].get<bool>() ||
                         (!unit.settings.requireOptimal && unit.settings.seconds > 0 &&
                          (exact["status"] == "FEASIBLE" || exact["status"] == "UNKNOWN")),
                     "Atlas violates publication policy");
@@ -799,7 +799,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             {"images", unit.symbols.size()},
             {"width", layout["width"]},
             {"height", layout["height"]},
-            {"solver", "exact"},
+            {"solver", unit.settings.fast ? "maxrects" : "exact"},
             {"time_limit_seconds", unit.settings.seconds ? Json(unit.settings.seconds) : Json(nullptr)},
             {"require_optimal", unit.settings.requireOptimal},
             {"exact", layout["exact"]}};

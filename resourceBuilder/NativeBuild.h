@@ -67,6 +67,7 @@ struct AtlasSettings
     unsigned padding = 2, maxSide = 4096, workers = 1;
     double seconds = 0;
     bool requireOptimal = true;
+    bool fast = false;
 };
 struct Config
 {

@@ -238,6 +238,14 @@ Json ExactLayout(const Json &sizes, const Json &native, const AtlasSettings &set
     using namespace operations_research;
     using namespace operations_research::sat;
     Validate(sizes, native, settings.padding, settings.maxSide);
+    if(settings.fast)
+    {
+        auto layout=native;
+        const auto area=1ULL*Integer(layout["width"])*Integer(layout["height"]);
+        layout["exact"]={{"solver","native-maxrects"},{"status","HEURISTIC"},
+            {"optimal",false},{"objective_area",area},{"best_bound",nullptr},{"gap",nullptr}};
+        return layout;
+    }
     fs::create_directories(directory);
     Json identity = {{"format", schema},
                      {"model_version", modelVersion},

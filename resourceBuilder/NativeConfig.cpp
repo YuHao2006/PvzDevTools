@@ -91,7 +91,10 @@ AtlasSettings Settings(AtlasSettings base, std::span<const std::string> args)
         const auto &value = args[i + 1];
         Require(seen.insert(key).second, "Duplicate atlas setting " + key);
         if (key == "solver")
-            Require(value == "exact", "Production solver must be exact");
+        {
+            Require(value == "exact" || value == "maxrects", "Unknown atlas solver");
+            base.fast = value == "maxrects";
+        }
         else if (key == "require_optimal")
         {
             Require(value == "true" || value == "false", "Invalid require_optimal value");
@@ -122,7 +125,7 @@ AtlasSettings Settings(AtlasSettings base, std::span<const std::string> args)
     Require(base.padding == 2 && base.maxSide >= 1 && base.maxSide <= 4096 && base.workers >= 1 &&
                 base.workers <= 64,
             "Invalid atlas settings");
-    Require(base.requireOptimal || base.seconds > 0, "Unproven layout requires a finite budget");
+    Require(base.fast || base.requireOptimal || base.seconds > 0, "Unproven layout requires a finite budget");
     return base;
 }
 

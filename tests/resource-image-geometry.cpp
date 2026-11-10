@@ -62,7 +62,23 @@ int main(int argc, char **argv)
         auto direct=DecodeImage(descriptor,{{"images/test.png",root/"original/image.png"}});
         Require(direct.width==12 && direct.height==8 && direct.logicalWidth==6 && direct.logicalHeight==4,
                 "Direct atlas source ignored its logical dimensions");
-        std::cout << "High-resolution logical extents, sprite cells, UV and alpha verified\n";
+        Json sceneReports=Json::object();
+        for(const auto &module:{"magnet","almanac","achievements","desktopui","landscapeui","commonui"})
+            sceneReports["compiled/scene/"+std::string(module)+".compiled"]={
+                {"atlas_width",100},{"atlas_height",100},
+                {"atlas_path","compiled/atlases/"+std::string(module)+".atlas.png"},
+                {"sprites",Json::array({{{"name","TEST"},{"region",{0,0,4,4,4,4}},{"scale",1.0}}})},
+                {"images",Json::array()}};
+        auto &cardRows=sceneReports["compiled/scene/commonui.compiled"]["sprites"];
+        cardRows.push_back({{"name","SEED_CARD_59"},{"region",{10,20,16,32,50,70}},{"scale",1.0}});
+        auto generated=GenerateScenes(sceneReports);
+        auto header=generated.at("SceneAtlasData.h");
+        auto implementation=generated.at("SceneAtlasData.cpp");
+        Require(std::string(header.begin(),header.end()).find("SeedCards[60]")!=std::string::npos,
+                "Special card 59 was omitted from generated direct-index table");
+        Require(std::string(implementation.begin(),implementation.end()).find(Region(Json{10,20,16,32,50,70},100,100))!=std::string::npos,
+                "Special card region lost its logical extent");
+        std::cout << "High-resolution extents, sprite cells, alpha and sparse special card atlas indexing verified\n";
         return 0;
     }
     catch (const std::exception &error)

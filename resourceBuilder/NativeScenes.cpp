@@ -345,9 +345,10 @@ Records GenerateScenes(const Json &reports)
                 if(name.starts_with("SEED_CARD_"))cards[std::stoul(name.substr(10))]=row["region"];
             }
             header+="inline constexpr bool HasSeedCards="+std::string(cards.empty()?"false":"true")+";\n";
-            header+="extern const Sexy::TextureRegion SeedCards[53];\n";
-            cpp+="const Sexy::TextureRegion SeedCards[53] = {\n";
-            for(unsigned i=0;i<53;++i)
+            const unsigned cardCount=cards.empty()?53u:std::max(53u,cards.rbegin()->first+1);
+            header+="extern const Sexy::TextureRegion SeedCards["+std::to_string(cardCount)+"];\n";
+            cpp+="const Sexy::TextureRegion SeedCards["+std::to_string(cardCount)+"] = {\n";
+            for(unsigned i=0;i<cardCount;++i)
                 cpp+="    "+Region(cards.contains(i)?cards.at(i):Json{0,0,0,0},width,height)+",\n";
             cpp+="};\n";
         }

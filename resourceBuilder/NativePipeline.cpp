@@ -290,7 +290,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         const auto cards=ReadJson(hdManifest).value("cards",Json::object());
         for(const auto &[id,image]:cards.items())
         {
-            Require(std::stoul(id)<53,"Unsupported high-resolution seed card");
+            Require(std::stoul(id)<65536,"High-resolution seed card index exceeds atlas index range");
             commonUI["sprites"].push_back({{"name","SEED_CARD_"+id},{"image",image},
                                            {"logical_size",{50,70}},{"scale",1.0}});
         }

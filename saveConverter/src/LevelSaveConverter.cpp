@@ -3923,8 +3923,9 @@ bool RepairSurvivalTransition(const std::filesystem::path& input,
     const auto ns = [&](std::string_view name) {
         return std::bit_cast<std::int64_t>(document.mNanoseconds.at(indexOf(name)));
     };
-    if (document.mNanoseconds.at(next) != 0 || ns("mBoardFadeOutCounter") >= 0 ||
-        ns("mZombieCountDown") > 0) return false;
+    // The last enemy can end the wave before its fallback spawn deadline.
+    // That deadline is not evidence that an awarded repick is still active combat.
+    if (document.mNanoseconds.at(next) != 0 || ns("mBoardFadeOutCounter") >= 0) return false;
     const auto original = document;
     // The normal update performs removal, stage advancement and chooser entry.
     // Do not set mLevelComplete here: the Continue dialog must finish first.

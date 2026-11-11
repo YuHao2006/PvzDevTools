@@ -126,7 +126,8 @@ Records PackFontImages(FontCorpus &corpus, const Files &files);
 Records ApplyHighResolutionFonts(const fs::path &root, FontCorpus &corpus);
 Image PackImages(const std::vector<const Image *> &images, const Json &layout);
 std::vector<std::size_t> ImageOffsets(std::string_view kind, std::span<const unsigned char> body);
-Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work);
+Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work,
+                   unsigned maxSide = 4096);
 Json ExactLayout(const Json &sizes, const Json &initial, const AtlasSettings &settings, const fs::path &cache,
                  const fs::path &seed);
 void PackAtlas(const fs::path &manifest, const fs::path &compiler, const fs::path &output,

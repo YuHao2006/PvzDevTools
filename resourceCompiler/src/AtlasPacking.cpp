@@ -13,7 +13,10 @@
 
 namespace openpvz::reanim::atlas {
 namespace {
-constexpr unsigned Limit = 4096;
+// One offline invocation uses a single configured packing domain. The default
+// remains suitable for portable releases; HD development can request a larger
+// domain without downscaling the source sprites.
+unsigned Limit = 4096;
 struct Rect { unsigned x, y, w, h; };
 struct Layout {
     unsigned width = 0, height = 0;
@@ -300,8 +303,17 @@ void Write(std::ostream& stream,std::uint64_t value,unsigned bytes=4)
 }
 int RunPackAtlasLayout(const std::vector<std::string>& args)
 {
-    if(args.size()!=5 || args[1]!="--input" || args[3]!="--output")
-        throw std::runtime_error("pack-atlas-layout requires --input BATCH --output LAYOUT");
+    if((args.size()!=5 && args.size()!=7) || args[1]!="--input" || args[3]!="--output" ||
+       (args.size()==7 && args[5]!="--max-side"))
+        throw std::runtime_error("pack-atlas-layout requires --input BATCH --output LAYOUT [--max-side SIZE]");
+    Limit=4096;
+    if(args.size()==7) {
+        std::size_t end=0;
+        const auto value=std::stoul(args[6],&end);
+        if(end!=args[6].size() || value<64 || value>16384)
+            throw std::runtime_error("atlas max-side must be between 64 and 16384");
+        Limit=static_cast<unsigned>(value);
+    }
     std::ifstream input(args[2],std::ios::binary);
     if(!input) throw std::runtime_error("cannot open atlas batch");
     if(Read(input)!=0x314B5041 || Read(input)!=1) throw std::runtime_error("invalid atlas batch header");

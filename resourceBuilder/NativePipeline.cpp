@@ -451,7 +451,9 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             sizes.push_back({images.at(name).width, images.at(name).height});
         batches.push_back(sizes);
     }
-    auto layouts = NativeLayouts(compiler, batches, work);
+    unsigned packingMaxSide=4096;
+    for(const auto &unit:units)packingMaxSide=std::max(packingMaxSide,unit.settings.maxSide);
+    auto layouts = NativeLayouts(compiler, batches, work, packingMaxSide);
     auto started = std::chrono::steady_clock::now();
     auto elapsed = [&] {
         return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();

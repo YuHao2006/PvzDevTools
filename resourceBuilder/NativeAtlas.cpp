@@ -182,7 +182,8 @@ unsigned long long Read64(Reader &reader)
 }
 } // namespace
 
-Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work)
+Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work,
+                   unsigned maxSide)
 {
     Bytes request;
     Word(request, 0x314b5041);
@@ -200,7 +201,7 @@ Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, con
     }
     Publish(work / "atlas-request.bin", request);
     Run(compiler, {"pack-atlas-layout", "--input", (work / "atlas-request.bin").string(), "--output",
-                   (work / "atlas-response.bin").string()});
+                   (work / "atlas-response.bin").string(), "--max-side", std::to_string(maxSide)});
     auto bytes = Read(work / "atlas-response.bin");
     Reader reader(bytes);
     Require(reader.Word() == 0x314c5041 && reader.Word() == 1 && reader.Word() == sizes.size(),
@@ -224,7 +225,7 @@ Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, con
                        {"search_attempts", attempts},
                        {"search_microseconds", micros},
                        {"method", "native-maxrects"}};
-        Validate(batch, layout, 2, 4096);
+        Validate(batch, layout, 2, maxSide);
         Require(!baseline || 1ULL * w * h <= baseline, "Native layout regresses shelf packing");
         result.push_back(layout);
     }

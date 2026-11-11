@@ -277,6 +277,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
     auto corpus = LoadFonts(definitions / "fonts");
     auto rawFiles = Inventory(root);
     Insert(records, PackFontImages(corpus, rawFiles));
+    Insert(records, ApplyHighResolutionFonts(root, corpus));
     Insert(records, CompileFonts(corpus));
     auto author = ReadJson(definitions / "resources.json");
     auto plan = CompileResources(root, author, corpus.tags);

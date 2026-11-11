@@ -123,6 +123,7 @@ Image DecodeImage(const ImageDescriptor &descriptor, const Files &files);
 void ApplyHighResolutionImages(const fs::path &root, std::map<std::string, ImageDescriptor> &descriptors);
 Bytes EncodePng(const Image &image);
 Records PackFontImages(FontCorpus &corpus, const Files &files);
+Records ApplyHighResolutionFonts(const fs::path &root, FontCorpus &corpus);
 Image PackImages(const std::vector<const Image *> &images, const Json &layout);
 std::vector<std::size_t> ImageOffsets(std::string_view kind, std::span<const unsigned char> body);
 Json NativeLayouts(const fs::path &compiler, const std::vector<Json> &sizes, const fs::path &work);

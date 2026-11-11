@@ -628,11 +628,68 @@ Records PackFontImages(FontCorpus &corpus, const Files &files)
     return result;
 }
 
+Records ApplyHighResolutionFonts(const fs::path &root, FontCorpus &corpus)
+{
+    const auto manifestPath = root / "assets/high-resolution/fonts.json";
+    Records result;
+    if (!fs::exists(manifestPath)) return result;
+    const auto manifest = ReadJson(manifestPath);
+    Require(manifest.at("format") == "pvz-high-resolution-fonts-v1", "Invalid HD font manifest");
+    const auto assetRoot = fs::weakly_canonical(root / "assets/high-resolution");
+    for (const auto &entry : manifest.at("fonts"))
+    {
+        auto font = std::find_if(corpus.fonts.begin(), corpus.fonts.end(), [&](const Json &f) {
+            return Lower(fs::path(f.at("source").get<std::string>()).stem().string()) == entry.at("font").get<std::string>();
+        });
+        Require(font != corpus.fonts.end(), "Unknown HD font");
+        for (const auto &replacement : entry.at("layers"))
+        {
+            auto layer = std::find_if((*font)["layers"].begin(), (*font)["layers"].end(), [&](const Json &l) {
+                return l.at("id") == replacement.at("id");
+            });
+            Require(layer != (*font)["layers"].end(), "Unknown HD font layer");
+            const auto path = replacement.at("image").get<std::string>();
+            Require(path.starts_with("high-resolution/fonts/"), "Invalid HD font image path");
+            const auto file = fs::weakly_canonical(root / "assets" / path);
+            const auto relative = file.lexically_relative(assetRoot);
+            Require(!relative.empty() && *relative.begin() != "..", "HD font escapes asset directory");
+            const auto &size = replacement.at("logicalSize");
+            Require(size.size() == 2 && size[0].get<int>() > 0 && size[1].get<int>() > 0,
+                    "Invalid HD font logical extent");
+            ImageDescriptor descriptor;
+            descriptor.path = path;
+            Files files; files[path] = file;
+            const auto image = DecodeImage(descriptor, files);
+            const auto width = size[0].get<unsigned>(), height = size[1].get<unsigned>();
+            Require(image.width >= width && image.height >= height && image.width <= 4096 && image.height <= 4096
+                    && image.width % width == 0 && image.height % height == 0
+                    && image.width / width == image.height / height, "HD font image must use uniform integer scale");
+            Require(replacement.at("glyphRects").size() == (*layer)["glyphs"].size(), "Incomplete HD font glyph map");
+            for (auto &[ch, glyph] : (*layer)["glyphs"].items())
+            {
+                const auto &r = replacement.at("glyphRects").at(ch);
+                const auto &old = glyph.at("rect");
+                Require(r.size() == 4 && r[2] == old[2] && r[3] == old[3], "HD font changed glyph dimensions");
+                Require(r[0].get<int>() >= 0 && r[1].get<int>() >= 0
+                        && r[0].get<unsigned>() + r[2].get<unsigned>() <= width
+                        && r[1].get<unsigned>() + r[3].get<unsigned>() <= height, "HD glyph outside image");
+                glyph["rect"] = r;
+            }
+            (*layer)["image"] = path;
+            (*layer)["logical_size"] = size;
+            result[path] = Read(file);
+        }
+    }
+    return result;
+}
+
 Records CompileFonts(const FontCorpus &corpus)
 {
     Records result;
     for (auto &font : corpus.fonts)
     {
+        const bool highResolution = std::any_of(font["layers"].begin(), font["layers"].end(),
+            [](const Json &layer) { return layer.contains("logical_size"); });
         Bytes payload;
         std::map<unsigned, unsigned> charMap;
         for (auto &[ch, target] : font["char_map"].items())
@@ -646,6 +703,12 @@ Records CompileFonts(const FontCorpus &corpus)
         {
             Word(payload, layer["id"].get<unsigned>());
             String(payload, layer["image"].get<std::string>());
+            if (highResolution)
+            {
+                const auto extent = layer.value("logical_size", Json::array({0, 0}));
+                Word(payload, extent[0].get<unsigned>());
+                Word(payload, extent[1].get<unsigned>());
+            }
             for (auto key : {"required", "excluded"})
             {
                 Word(payload, unsigned(layer[key].size()));
@@ -678,7 +741,7 @@ Records CompileFonts(const FontCorpus &corpus)
             }
         }
         Bytes record;
-        for (unsigned v : {0x544e464eu, 1u, unsigned(payload.size()), Crc(payload)})
+        for (unsigned v : {0x544e464eu, highResolution ? 2u : 1u, unsigned(payload.size()), Crc(payload)})
             Word(record, v);
         Integer(record, font["point_size"].get<int>());
         Word(record, unsigned(charMap.size()));

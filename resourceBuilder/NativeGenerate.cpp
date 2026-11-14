@@ -419,6 +419,8 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         shard = {"#include \"../GeneratedDefinitions.h\"", "#include \"../GeneratedDefinitionStorage.h\"", "",
                  "namespace GeneratedDefinitions {"};
     Lines declarations, initializers, fontBindings, fontResets, attacherInitializers;
+    Lines layoutCode={"// Generated action ranges and legacy v5 save mapping. Do not edit.","#pragma once","#include \"Sexy.TodLib/ReanimActionLayout.h\"","namespace ReanimActionData {"};
+    Lines layoutRows,attacherRows;
     Json rs = {{"definitions", rc},
                {"tracks", 0},
                {"frames", 0},
@@ -444,9 +446,39 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         };
         Lines trackValues;
         unsigned count = unsigned(definition.tracks.size());
+        const auto& metadata=reports.at(path);
+        const auto names=metadata.at("track_names").get<std::vector<std::string>>();
+        const auto actionOnly=metadata.value("action_only_tracks",std::set<std::string>{});
+        std::map<std::string,std::pair<unsigned,unsigned>> authored;
+        for(const auto&a:metadata.value("authored_actions",Json::array()))authored.emplace(a.at("name").get<std::string>(),std::pair{a.at("first").get<unsigned>(),a.at("count").get<unsigned>()});
+        Require(names.size()==count,"Action track-name count mismatch");
+        Require(count <= 32767, "Legacy track mapping exceeds signed 16-bit index range");
+        std::vector<int> remap(count,-1);Lines mapValues,actionValues,rangeValues;
+        std::array<std::uint64_t,4> attachmentMask{};
+        int groundIndex=-1;unsigned runtimeCount=0;
+        for(unsigned t=0;t<count;++t){
+            const auto& track=definition.tracks[t];
+            bool remove=actionOnly.contains(names[t]);
+            if(remove)for(const auto& frame:track.frames)Require(!frame.slot&&!frame.font&&!frame.hasText,"Action-only record contains drawable data");
+            auto a=authored.find(names[t]);
+            actionValues.push_back(a==authored.end()?"{0,0}":"{"+std::to_string(a->second.first)+","+std::to_string(a->second.second)+"}");
+            if(!remove){Require(runtimeCount<256,"Reanim runtime track count exceeds activity mask capacity");remap[t]=int(runtimeCount++);int first=0,last=-1;for(unsigned f=0;f<track.frames.size();++f)if(track.frames[f].cel>=0){if(last<0)first=int(f);last=int(f);}rangeValues.push_back("{"+std::to_string(first)+","+std::to_string(last<0?1:last-first+1)+"}");
+                if(names[t]=="_ground")groundIndex=remap[t];
+                if(names[t].starts_with("attacher__"))attachmentMask[remap[t]>>6]|=1ull<<(remap[t]&63);
+            }
+            mapValues.push_back(std::to_string(remap[t]));
+        }
+        Require(runtimeCount>0,"Reanim definition needs at least one runtime transform track");
+        const auto layoutPrefix="Layout"+std::to_string(index);
+        layoutCode.push_back("inline constexpr std::int16_t "+layoutPrefix+"Map[]={"+Join(mapValues,",")+"};");
+        layoutCode.push_back("inline constexpr ReanimActionRange "+layoutPrefix+"Actions[]={"+Join(actionValues,",")+"};");
+        layoutCode.push_back("inline constexpr ReanimActionRange "+layoutPrefix+"Tracks[]={"+Join(rangeValues,",")+"};");
+        layoutRows.push_back("{"+layoutPrefix+"Map,"+layoutPrefix+"Actions,"+layoutPrefix+"Tracks,"+std::to_string(count)+","+std::to_string(groundIndex)+"}");
+        Lines maskValues;for(auto word:attachmentMask)maskValues.push_back(std::to_string(word)+"ull");attacherRows.push_back("{"+Join(maskValues,",")+"}");
         for (unsigned t = 0; t < count; ++t)
         {
             const auto &track = definition.tracks[t];
+            if(remap[t]<0)continue;
             auto storage = std::array<const char *, 3>{"both", "cpu", "gpu"}.at(track.flags >> 1);
             rs["storage_tracks"][storage] = rs["storage_tracks"][storage].get<unsigned>() + 1;
             Lines values;
@@ -512,12 +544,14 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
                 result.push_back(std::to_string(v) + "u");
             return result;
         };
+        const auto compactValues=[&](const std::vector<unsigned>& input,unsigned rows){std::vector<unsigned> result;for(unsigned row=0;row<rows;++row)for(unsigned t=0;t<count;++t)if(remap[t]>=0)result.push_back(input[row*count+t]);return result;};
+        starts=compactValues(starts,1);counts=compactValues(counts,1);options=compactValues(options,variants);
         auto startName = emit("std::uint32_t", "ActionStarts", integers(starts)),
              countName = emit("std::uint32_t", "ActionCounts", integers(counts)),
              optionName = emit("std::uint32_t", "Options", integers(options));
         initializers.push_back(
             "{" +
-            Join({"{" + tracks + ", " + std::to_string(count) + "}", CppFloat(definition.fps),
+            Join({"{" + tracks + ", " + std::to_string(runtimeCount) + "}", CppFloat(definition.fps),
                   std::to_string(externalBegins[index])+"u", textures,
                   std::to_string(variants) + "u", std::to_string(slots) + "u", std::to_string(actions) + "u",
                   std::to_string(externalOffsets[index])+"u", rects, transitions, startName, countName, optionName},
@@ -551,9 +585,10 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
                 else
                     length = last - first + 1;
             }
+            Require(segment.values[0]<remap.size()&&remap[segment.values[0]]>=0,"Attacher references removed action marker");
             Lines fields;
             for (unsigned i = 0; i < 9; ++i)
-                fields.push_back(i == 5 ? CppFloat(segment.rate) : std::to_string(segment.values[i]) + "u");
+                fields.push_back(i == 5 ? CppFloat(segment.rate) : std::to_string(i==0?unsigned(remap.at(segment.values[i])):segment.values[i]) + "u");
             fields.push_back(std::to_string(first));
             fields.push_back(std::to_string(length));
             segmentValues.push_back("{" + Join(fields, ", ") + "}");
@@ -563,12 +598,16 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
             segmentValues.empty() ? "{}"
                                   : "{" + segments + ", " + std::to_string(segmentValues.size()) + "}");
         for (auto [key, value] : std::vector<std::pair<std::string, unsigned>>{
-                 {"tracks", count},
+                 {"tracks", runtimeCount},
                  {"variants", variants},
                  {"rectangles", variants * slots},
                  {"attacher_segments", unsigned(segmentValues.size())}})
             rs[key] = rs[key].get<unsigned>() + value;
     }
+    layoutCode.push_back("inline constexpr ReanimActionLayout Layouts[]={"+Join(layoutRows,",")+"};");
+    layoutCode.push_back("inline constexpr std::uint64_t AttacherMasks[][4]={"+Join(attacherRows,",")+"};");
+    layoutCode.push_back("}");
+    result.files["ReanimActionData.h"]=Source(layoutCode);
     rs["font_frames"] = fontBindings.size();
     rs["rectangle_bytes"] = rs["rectangles"].get<unsigned>() * 24;
     for (unsigned i = 0; i < 8; ++i)

@@ -138,11 +138,17 @@ inline constexpr std::uint32_t kTrackUiTextMask = 1u;
 inline constexpr unsigned kTrackStorageShift = 1;
 inline constexpr std::uint32_t kTrackStorageMask = 6u;
 
+struct RawAction final {
+    std::string name;
+    std::uint32_t firstFrame = 0, frameCount = 0;
+};
+
 struct RawTrack final {
     std::string name;  // raw between tags
     std::vector<RawTransform> frames;
     std::vector<TrackAttacherSegment> attacherSegments;  // 仅 attacher 轨道非空
     TrackStorage storage = TrackStorage::both;
+    bool actionMarkerOnly = false; // Compatibility lowering only; not a drawable/runtime track.
 };
 
 struct RawReanim final {
@@ -151,6 +157,8 @@ struct RawReanim final {
     // into the record itself.
     std::string name;
     float fps = 12.0f;
+    std::uint32_t timelineFrameCount = 0;
+    std::vector<RawAction> actions;
     std::vector<RawTrack> tracks;
     std::string variantOf;
     std::string variantRoot;

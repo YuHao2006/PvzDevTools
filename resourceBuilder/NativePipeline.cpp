@@ -624,6 +624,9 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         auto report = rows[0];
         report.update(result.atlas);
         report["variants"] = rows;
+        report["track_names"] = metadata.at("tracks");
+        report["authored_actions"] = metadata.value("actions", Json::array());
+        report["action_only_tracks"] = metadata.value("action_only_tracks", Json::array());
         reports[name] = report;
     }
     for (auto &[name, metadata] : particleMetadata.items())

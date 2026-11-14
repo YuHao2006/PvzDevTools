@@ -490,6 +490,17 @@ private:
                 if(!symbol.starts_with("IMAGE_")||!target.starts_with("IMAGE_"))Fail(error_,"shared-image requires image resource symbols");
                 if(std::any_of(module.sharedImages.begin(),module.sharedImages.end(),[&](const auto& row){return row.first==symbol;}))Fail(error_,"duplicate shared image slot");
                 module.sharedImages.emplace_back(symbol,target);
+            } else if (lexer_.current().text == "frame-count") {
+                lexer_.Advance();
+                if(lexer_.current().kind!=TokenKind::colon)Fail(error_,"expected ':' after component frame-count");
+                lexer_.Advance();
+                if(lexer_.current().kind!=TokenKind::number)Fail(error_,"expected component frame count");
+                const auto count=ParseDecimalInteger(lexer_.current().text);
+                if(count<=0||std::uint64_t(count)>kMaxFramesPerTrack)Fail(error_,"component frame count outside limit");
+                if(module.timelineFrameCount)Fail(error_,"duplicate component frame-count");
+                module.timelineFrameCount=std::uint32_t(count);lexer_.Advance();ExpectSemicolon();
+            } else if (lexer_.current().text == "Actions") {
+                ReadActions(module);
             } else if (lexer_.current().text == "fps") {
                 hasFps = true;
                 ReadFps(module);
@@ -536,6 +547,42 @@ private:
         const std::string value = lexer_.current().text;
         lexer_.Advance();
         return value;
+    }
+    void ReadActions(RawReanim& module)
+    {
+        lexer_.Advance();ExpectBrace("{");
+        while(lexer_.current().text!="}") {
+            RawAction action;
+            if(lexer_.current().kind==TokenKind::string)action.name=TakeString();
+            else {action.name=lexer_.current().text;ConsumeIdentifier();}
+            if(action.name.empty())Fail(error_,"action name must not be empty");
+            if(std::any_of(module.actions.begin(),module.actions.end(),[&](const auto&a){return a.name==action.name;}))Fail(error_,"duplicate action <"+action.name+">");
+            ExpectBrace("{");bool firstSet=false,countSet=false;
+            while(lexer_.current().text!="}") {
+                const std::string field=lexer_.current().text;ConsumeIdentifier();
+                if(lexer_.current().kind!=TokenKind::colon)Fail(error_,"expected ':' in action");
+                lexer_.Advance();if(lexer_.current().kind!=TokenKind::number)Fail(error_,"expected integer action frame");
+                const auto value=ParseDecimalInteger(lexer_.current().text);
+                if(value<0||std::uint64_t(value)>kMaxFramesPerTrack)Fail(error_,"action frame outside limit");
+                lexer_.Advance();ExpectSemicolon();
+                if(field=="first-frame"&&!firstSet){action.firstFrame=unsigned(value);firstSet=true;}
+                else if(field=="frame-count"&&!countSet){action.frameCount=unsigned(value);countSet=true;}
+                else Fail(error_,"unknown or duplicate action field <"+field+">");
+            }
+            ExpectBrace("}");
+            if(!firstSet||!countSet||!action.frameCount||!module.timelineFrameCount||action.firstFrame>=module.timelineFrameCount||action.frameCount>module.timelineFrameCount-action.firstFrame)Fail(error_,"action range outside component timeline");
+            // Preserve old artifact IDs/order for the compatibility build stage. Native
+            // generation receives actionMarkerOnly and emits action records separately.
+            auto existing=std::find_if(module.tracks.begin(),module.tracks.end(),[&](const auto&t){return t.name==action.name;});
+            if(existing==module.tracks.end()) {
+                RawTrack marker;marker.name=action.name;marker.actionMarkerOnly=true;
+                marker.frames.resize(module.timelineFrameCount);
+                for(unsigned f=0;f<module.timelineFrameCount;++f){auto&key=marker.frames[f];key.cel=f>=action.firstFrame&&f-action.firstFrame<action.frameCount?0:-1;key.values[6]=float(key.cel);}
+                module.tracks.push_back(std::move(marker));
+            }
+            module.actions.push_back(std::move(action));
+        }
+        ExpectBrace("}");
     }
     void ReadFps(RawReanim& module)
     {
@@ -660,7 +707,9 @@ private:
         }
         for (std::size_t fill = previous + 1; fill < track.frames.size(); ++fill)
             track.frames[fill] = track.frames[previous];
-        module.tracks.push_back(std::move(track));
+        auto marker=std::find_if(module.tracks.begin(),module.tracks.end(),[&](const auto&t){return t.name==track.name&&t.actionMarkerOnly;});
+        if(marker!=module.tracks.end())*marker=std::move(track);
+        else module.tracks.push_back(std::move(track));
     }
     RawTransform ReadFrameBody(bool (&set)[8], bool& setImage, bool& setFont,
                                bool& setText)
@@ -849,6 +898,11 @@ std::string MakeReanimVariantMetadata(const std::vector<RawReanim>& corpus)
             if (t) out << ',';
             WriteEscaped(out, root.tracks[t].name);
         }
+        out << "],\"actions\":[";
+        for(std::size_t i=0;i<root.actions.size();++i){if(i)out<<',';const auto&a=root.actions[i];out<<"{\"name\":";WriteEscaped(out,a.name);out<<",\"first\":"<<a.firstFrame<<",\"count\":"<<a.frameCount<<'}';}
+        out << "],\"action_only_tracks\":[";
+        bool firstActionOnly=true;
+        for(const auto&t:root.tracks)if(t.actionMarkerOnly){if(!firstActionOnly)out<<',';firstActionOnly=false;WriteEscaped(out,t.name);}
         out << "],\"variants\":[";
         std::vector<const RawReanim*> variants{&root};
         for (const auto& item : corpus)
@@ -1077,8 +1131,20 @@ std::string ToDsl(const RawReanim& source)
         << (source.name.empty() ? std::string("Reanim") : source.name)
         << " {\n";
     out << "    fps: " << FloatText(source.fps) << ";\n";
+    if (!source.actions.empty())
+        out << "    frame-count: " << source.timelineFrameCount << ";\n";
+    std::set<std::string> emittedActions;
     TrackStorage storage = TrackStorage::both;
     for (const RawTrack& track : source.tracks) {
+        auto action = std::find_if(source.actions.begin(), source.actions.end(),
+            [&](const auto& value) { return value.name == track.name; });
+        if (action != source.actions.end() && emittedActions.insert(action->name).second) {
+            out << "    Actions {\n        ";
+            WriteEscaped(out, action->name);
+            out << " { first-frame: " << action->firstFrame
+                << "; frame-count: " << action->frameCount << "; }\n    }\n";
+        }
+        if (track.actionMarkerOnly) continue;
         if (track.storage != storage) {
             (void)StorageBits(track.storage);
             out << "    " << (track.storage == TrackStorage::cpu ? "cpu" :

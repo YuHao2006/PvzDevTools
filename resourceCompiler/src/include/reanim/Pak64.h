@@ -317,7 +317,7 @@ struct TrackIdEntry final {
 // MphfGlobalTypeInCorpus(type)。typeMap 提供折叠模块名 -> ReanimationType 数值。
 [[nodiscard]] std::string MakeTrackMphfGlobalHeader(
     const std::vector<RawReanim>& corpus, const std::vector<TrackIdEntry>& table,
-    const std::vector<ReanimTypeMapEntry>& typeMap);
+    const std::vector<ReanimTypeMapEntry>& typeMap, bool runtimeLayout = false);
 
 [[nodiscard]] std::vector<std::uint8_t> SerializeV2(
     const RawReanim& source, const std::vector<TrackIdEntry>& table,

@@ -422,6 +422,10 @@ int RunCompileV2(const std::vector<std::string>& args)
                    pak64::MakeTrackMphfGlobalHeader(roots, table, typeMap)))
         return 1;
 
+    if (!WriteText(output / "ReanimRuntimeLookup.h",
+                   pak64::MakeTrackMphfGlobalHeader(roots, table, typeMap, true)))
+        return 1;
+
     // Images are source-local names, independent of every game image registry.
     pak64::SourceImageHandles sourceImageHandles;
     for (const auto& definition:corpus)

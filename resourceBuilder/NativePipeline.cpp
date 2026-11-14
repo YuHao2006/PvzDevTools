@@ -226,7 +226,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
          zombatar = ReadJson(config.sources.at("zombatar")[0]);
     Run(compiler, {"bake-strings", "--input", (definitions / "LawnStrings.txt").string(), "--output-dir",
                    (work / "strings").string()});
-    for (auto name : {"ReanimTrackId.h", "ReanimTrackMphfGlobal.h"})
+    for (auto name : {"ReanimTrackId.h", "ReanimTrackMphfGlobal.h", "ReanimRuntimeLookup.h"})
         deferred["../" + std::string(name)] = Read(work / "reanim" / name);
     for (auto name : {"ReanimVariantId.h"})
         deferred[name] = Read(work / "reanim" / name);

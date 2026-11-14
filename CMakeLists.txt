@@ -21,6 +21,7 @@ add_executable(pvz-resource-build
     resourceBuilder/NativePackAtlas.cpp
     resourceBuilder/NativeDefinitions.cpp
     resourceBuilder/NativeScenes.cpp
+    resourceBuilder/NativeUiCompositions.cpp
     resourceBuilder/NativeGenerate.cpp
     resourceBuilder/NativePipeline.cpp
     resourceBuilder/NativeCompact.cpp)
@@ -35,6 +36,13 @@ if(BUILD_TESTING)
     target_compile_options(pvz-resource-image-test PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
     target_link_libraries(pvz-resource-image-test PRIVATE ZLIB::ZLIB nlohmann_json::nlohmann_json spng::spng_static libjpeg-turbo::jpeg-static)
     add_test(NAME high-resolution-image-geometry COMMAND pvz-resource-image-test "${CMAKE_CURRENT_BINARY_DIR}/hd-image-test")
+    add_executable(pvz-ui-composition-test tests/ui-composition.cpp resourceBuilder/NativeUiCompositions.cpp resourceBuilder/NativeCommon.cpp)
+    target_include_directories(pvz-ui-composition-test PRIVATE resourceBuilder)
+    target_compile_features(pvz-ui-composition-test PRIVATE cxx_std_23)
+    target_compile_options(pvz-ui-composition-test PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    target_link_libraries(pvz-ui-composition-test PRIVATE ZLIB::ZLIB nlohmann_json::nlohmann_json)
+    add_test(NAME compact-ui-composition COMMAND pvz-ui-composition-test)
+
 endif()
 if(WIN32)
     add_custom_command(TARGET pvz-resource-build POST_BUILD

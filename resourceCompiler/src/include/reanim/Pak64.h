@@ -155,6 +155,7 @@ struct RawReanim final {
     std::string variantOf;
     std::string variantRoot;
     std::vector<std::vector<std::string>> variantImages;
+    std::vector<std::pair<std::string,std::string>> sharedImages;
 };
 
 // Resolve image-only variants after collecting the complete source corpus.

@@ -238,6 +238,9 @@ Config LoadConfig(const fs::path &path)
                 config.order[args[0]].emplace_back(symbol, name);
             }
         }
+        else if(command=="compact_ui") {
+            Require(args==std::vector<std::string>{"1"},"compact_ui expects 1");config.compactUi=true;
+        }
         else if (command == "atlas_defaults")
         {
             Require(!defaults, "Duplicate atlas_defaults");

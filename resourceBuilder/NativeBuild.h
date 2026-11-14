@@ -76,7 +76,9 @@ struct Config
     std::map<std::string, std::vector<std::pair<std::string, std::string>>> order;
     std::map<std::string, std::vector<std::string>> groups;
     std::map<std::string, AtlasSettings> settings;
+    bool compactUi=false;
     AtlasSettings defaults;
+    std::map<std::string,std::string> sharedImages;
 };
 Config LoadConfig(const fs::path &path);
 void ValidateCatalogs(const Config &config, const fs::path &root);
@@ -115,6 +117,9 @@ struct Image
     unsigned width = 0, height = 0;
     unsigned logicalWidth = 0, logicalHeight = 0;
     Bytes rgba;
+    bool compacted=false;
+    int trimWidth=0,trimHeight=0;
+    int trimX=0,trimY=0; // logical origin retained when transparent pixels are omitted
     std::set<std::string> files;
 };
 std::map<std::string, ImageDescriptor> ImageDescriptors(const Json &author, const Files &files,
@@ -166,6 +171,8 @@ struct Generated
 Generated GenerateDefinitions(const Config &config, const Records &records, const Json &reports,
                               const fs::path &generated);
 std::string AttacherMasks(std::string_view mphf, std::string_view tracks);
+void CompactUi(Json& scenes,const Json& zombatar,std::map<std::string,Image>& images,
+    std::map<std::string,std::vector<std::string>>& symbols);
 void Build(const fs::path &root, const fs::path &compiler, const fs::path &config, const fs::path &cache,
            const fs::path &generated);
 } // namespace pvz::build

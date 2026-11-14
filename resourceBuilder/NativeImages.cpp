@@ -322,6 +322,15 @@ void ApplyHighResolutionImages(const fs::path &root, std::map<std::string, Image
         Require(!relative.empty() && *relative.begin() != ".." && fs::is_regular_file(path),
                 "High-resolution image must be a file inside assets/high-resolution: " + key);
         descriptor.highResolution = path;
+        if (document.contains("logicalSizes") && document.at("logicalSizes").contains(key))
+        {
+            const auto &logical = document.at("logicalSizes").at(key);
+            Require(logical.is_array() && logical.size() == 2 &&
+                        logical[0].get<int>() > 0 && logical[1].get<int>() > 0,
+                    "Invalid high-resolution logical dimensions: " + key);
+            descriptor.logicalWidth = logical[0].get<unsigned>();
+            descriptor.logicalHeight = logical[1].get<unsigned>();
+        }
     }
 }
 

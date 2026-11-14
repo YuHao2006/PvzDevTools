@@ -288,11 +288,15 @@ Json CompileScene(const Json &document, const Json &layout, const std::vector<st
         int x = rect[0], y = rect[1], w = rect[2], h = rect[3];
         Require(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= int(image.logicalWidth) && y + h <= int(image.logicalHeight),
                 "Scene sprite outside source " + row["name"].get<std::string>());
+        row["canvas_size"]={image.logicalWidth,image.logicalHeight};
+        row["trim_rect"]={image.trimX,image.trimY,image.compacted?image.trimWidth:int(image.logicalWidth),image.compacted?image.trimHeight:int(image.logicalHeight)};
         row["source_rect"] = rect;
         const double sx = double(image.width) / image.logicalWidth;
         const double sy = double(image.height) / image.logicalHeight;
         row["region"] = {regions.at(source)[0].get<int>() + x * sx,
                          regions.at(source)[1].get<int>() + y * sy, w * sx, h * sy, w, h};
+        if(image.compacted)
+            row["region"]={regions.at(source)[0],regions.at(source)[1],image.width,image.height,image.trimWidth,image.trimHeight};
         sprites.push_back(row);
     }
     return {{"name", document["name"]},
@@ -336,6 +340,12 @@ Records GenerateScenes(const Json &reports)
         for (auto &row : rows)
             cpp += "    " + Region(row["region"], width, height) + ",\n";
         cpp += "};\n";
+        if(module=="Almanac") {
+            header+="extern const Sexy::Rect Crops[Count];\n";
+            cpp+="const Sexy::Rect Crops[Count] = {\n";
+            for(const auto& row:rows){const auto r=row.value("trim_rect",Json{0,0,row["region"][4],row["region"][5]});cpp+="    {"+std::to_string(r[0].get<int>())+","+std::to_string(r[1].get<int>())+","+std::to_string(r[2].get<int>())+","+std::to_string(r[3].get<int>())+"},\n";}
+            cpp+="};\n";
+        }
         if(module=="CommonUI")
         {
             std::map<unsigned,Json> cards;
@@ -457,9 +467,16 @@ Records GenerateZombatar(const Json &document, const Json &report)
         Json r = Json::array();
         for (unsigned i = 0; i < 4; ++i)
             r.push_back(row["region"][i]);
+        r.push_back(row["logical_width"]);
+        r.push_back(row["logical_height"]);
         cpp += "        " + Region(r, width, height) + ",\n";
     }
-    cpp += "    }}, nullptr\n};\nstatic_assert(static_cast<std::size_t>(ZombatarImage::Count) == 209);\nvoid "
+    cpp += "    }}, nullptr, {{\n";
+    for(const auto& row:report["images"]) {
+        const auto r=row.value("trim_rect",Json{0,0,row["logical_width"],row["logical_height"]});
+        cpp+="        {"+std::to_string(r[0].get<int>())+","+std::to_string(r[1].get<int>())+","+std::to_string(r[2].get<int>())+","+std::to_string(r[3].get<int>())+"},\n";
+    }
+    cpp += "    }}\n};\nstatic_assert(static_cast<std::size_t>(ZombatarImage::Count) == 209);\nvoid "
            "ZombatarLoadResources() {\n    DefinitionBindAtlasPath(gZombatarAtlas.mTexture, " +
            std::to_string(width) + ", " + std::to_string(height) + ", " +
            CppString(report["atlas_path"].get<std::string>()) +

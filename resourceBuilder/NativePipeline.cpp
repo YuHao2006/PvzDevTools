@@ -60,7 +60,7 @@ Json GeometryReport(const std::vector<std::string> &symbols, const Json &layout,
                         {"width", image.width},
                         {"height", image.height},
                         {"logical_width", image.logicalWidth},
-                        {"logical_height", image.logicalHeight},
+                        {"logical_height", image.logicalHeight}, {"trim_rect",{image.trimX,image.trimY,image.compacted?image.trimWidth:int(image.logicalWidth),image.compacted?image.trimHeight:int(image.logicalHeight)}},
                         {"rows", d.rows},
                         {"cols", d.cols},
                         {"rgba_bytes", image.rgba.size()},
@@ -262,6 +262,11 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
     }
     auto particleMetadata = ReadJson(work / "particles/particle_variants.json").at("roots"),
          reanimMetadata = ReadJson(work / "reanim/reanim_variants.json").at("roots");
+    for(const auto& metadata:reanimMetadata)for(const auto& [symbol,target]:metadata.value("shared_images",Json::object()).items()){
+        const auto resource=target.get<std::string>();
+        Require(!config.sharedImages.contains(symbol)||config.sharedImages.at(symbol)==resource,"Conflicting external image bindings");
+        config.sharedImages[symbol]=resource;
+    }
     auto inheritance = ReadJson(work / "particles/particle_inheritance.json");
     for (auto &[child, parent] : inheritance.items())
         Require(records.contains(child) && records.contains(parent.get<std::string>()),
@@ -414,6 +419,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
                 images[symbol] = DecodeImage(sourceImages.at(symbol), rawFiles);
         definitionSymbols[name] = {symbols.begin(), symbols.end()};
     }
+    if(config.compactUi)CompactUi(scenes,zombatar,images,definitionSymbols);
     std::vector<Unit> units;
     std::set<std::string> grouped;
     for (auto &[name, members] : ResolveGroups(config, definitionNames))
@@ -445,6 +451,7 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
         std::set<std::string> symbols;
         for (auto &member : unit.members)
             symbols.insert(definitionSymbols.at(member).begin(), definitionSymbols.at(member).end());
+        for(const auto& [symbol,target]:config.sharedImages)symbols.erase(symbol);
         unit.symbols = {symbols.begin(), symbols.end()};
         Json sizes = Json::array();
         for (auto &name : unit.symbols)
@@ -522,7 +529,11 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
     for (unsigned index = 0; index < units.size(); ++index)
     {
         const auto &unit = units[index];
-        const auto &layout = layouts[index];
+        auto layout = layouts[index];
+        Json shared=Json::object();
+        for(const auto& [symbol,target]:config.sharedImages)if(images.contains(symbol))
+            shared[symbol]={{"resource",target},{"width",images.at(symbol).width},{"height",images.at(symbol).height}};
+        layout["shared_images"]=shared;
         auto path = unit.path.empty() ? unit.members[0].substr(0, unit.members[0].size() - 9) + ".atlas.png"
                                       : unit.path;
         if (!unit.symbols.empty())
@@ -542,7 +553,9 @@ void Build(const fs::path &root, const fs::path &compiler, const fs::path &confi
             if (virtualVariants.contains(name))
             {
                 variantLayouts[name] = {{"layout", layout}, {"symbols", unit.symbols}};
-                auto report = GeometryReport(definitionSymbols.at(name), layout, unit.symbols, images,
+                auto physicalSymbols=definitionSymbols.at(name);
+                std::erase_if(physicalSymbols,[&](const auto& symbol){return config.sharedImages.contains(symbol);});
+                auto report = GeometryReport(physicalSymbols, layout, unit.symbols, images,
                                              sourceImages, path, !unit.path.empty());
                 report["name"] = virtualVariants[name]["variant"]["name"];
                 variantReports[name] = report;

@@ -479,6 +479,17 @@ private:
                 }
                 bracket("]");
                 ExpectSemicolon();
+            } else if (lexer_.current().text == "shared-image") {
+                lexer_.Advance();
+                if(lexer_.current().kind!=TokenKind::colon)Fail(error_,"expected ':' after shared-image");
+                lexer_.Advance();
+                if(lexer_.current().kind!=TokenKind::identifier)Fail(error_,"expected local image slot");
+                const auto symbol=lexer_.current().text;lexer_.Advance();
+                if(lexer_.current().kind!=TokenKind::identifier)Fail(error_,"expected shared image resource");
+                const auto target=lexer_.current().text;lexer_.Advance();ExpectSemicolon();
+                if(!symbol.starts_with("IMAGE_")||!target.starts_with("IMAGE_"))Fail(error_,"shared-image requires image resource symbols");
+                if(std::any_of(module.sharedImages.begin(),module.sharedImages.end(),[&](const auto& row){return row.first==symbol;}))Fail(error_,"duplicate shared image slot");
+                module.sharedImages.emplace_back(symbol,target);
             } else if (lexer_.current().text == "fps") {
                 hasFps = true;
                 ReadFps(module);
@@ -830,7 +841,10 @@ std::string MakeReanimVariantMetadata(const std::vector<RawReanim>& corpus)
         if (!firstRoot) out << ',';
         firstRoot = false;
         WriteEscaped(out, root.name);
-        out << ":{\"tracks\":[";
+        out << ":{\"shared_images\":{";
+        bool firstShared=true;
+        for(const auto& [symbol,target]:root.sharedImages){if(!firstShared)out<<',';firstShared=false;WriteEscaped(out,symbol);out<<':';WriteEscaped(out,target);}
+        out << "},\"tracks\":[";
         for (std::size_t t = 0; t < root.tracks.size(); ++t) {
             if (t) out << ',';
             WriteEscaped(out, root.tracks[t].name);

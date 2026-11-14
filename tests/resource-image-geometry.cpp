@@ -35,6 +35,16 @@ int main(int argc, char **argv)
         Require(image.width == 48 && image.height == 32 && image.logicalWidth == 12 && image.logicalHeight == 8,
                 "Physical and logical image extents were conflated");
         Require(image.rgba[3] == 128, "Replacement alpha was changed");
+        Publish(root / "assets/high-resolution/images.json",
+                Json{{"format", "pvz-high-resolution-images-v1"},
+                     {"images", {{"images/test", "image.png"}}},
+                     {"logicalSizes", {{"images/test", {12, 16}}}}}.dump());
+        ApplyHighResolutionImages(root, descriptors);
+        const auto resized = DecodeImage(descriptors.at("TEST"),
+                                         {{"images/test.png", root / "original/image.png"}});
+        Require(resized.width == 48 && resized.height == 32 &&
+                    resized.logicalWidth == 12 && resized.logicalHeight == 16,
+                "HD logical canvas override was ignored by definition atlas images");
         const Json report{{"images", Json::array({{{"region", {10, 20, 48, 32, 1, 3}},
                                                    {"width", 48}, {"height", 32},
                                                    {"logical_width", 12}, {"logical_height", 8}}})}};

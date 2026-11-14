@@ -36,8 +36,8 @@ std::string Array(Lines &declarations, Lines &code, const std::string &type, con
                            std::to_string(values.size()) + "];");
     code.push_back("constinit " + std::string(qualifier) + type + " " + name + "[" +
                    std::to_string(values.size()) + "] = {");
-    for (auto &row : values)
-        code.push_back("    " + row + ",");
+    if(!std::all_of(values.begin(),values.end(),[](const auto& row){return row=="nullptr";}))
+        for (auto &row : values)code.push_back("    " + row + ",");
     code.push_back("};");
     return name;
 }
@@ -374,6 +374,46 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         expected.insert(path);
         definitions.push_back(ParseReanim(records.at(path)));
     }
+    // Only external ResourceManager textures have global pointer entries.
+    // UV/image slots remain definition-local; a compact tail is used only by
+    // definitions that actually reference external images.
+    std::map<std::string,unsigned> externalIds;
+    std::vector<std::string> externalResources;
+    std::vector<std::vector<unsigned>> slotOrders(rc),slotRemaps(rc);
+    std::vector<unsigned> externalBegins(rc),externalOffsets(rc);
+    Lines externalBindings;
+    for(unsigned index=0;index<rc;++index) {
+        const auto& report=reports.at("compiled/reanim/"+Lower(reanimOrder[index].second)+".compiled");
+        const unsigned slots=report["slot_count"];
+        std::vector<unsigned> ordinary,external;
+        for(unsigned slot=0;slot<slots;++slot) {
+            bool shared=false;
+            for(const auto& row:report.at("slot_sources"))
+                shared|=config.sharedImages.contains(row[slot].get<std::string>());
+            (shared?external:ordinary).push_back(slot);
+        }
+        auto& order=slotOrders[index];order=ordinary;
+        if(!external.empty()) {
+            Require(!ordinary.empty()&&ordinary.front()==0,"External image zero slot is reserved");
+            externalBegins[index]=unsigned(ordinary.size());
+            externalOffsets[index]=unsigned(externalBindings.size());
+            for(const auto& row:report.at("slot_sources"))
+                for(unsigned slot:external) {
+                    auto found=config.sharedImages.find(row[slot].get<std::string>());
+                    unsigned id=0;
+                    if(found!=config.sharedImages.end()) {
+                        const auto& resource=found->second;
+                        auto [it,added]=externalIds.try_emplace(resource,unsigned(externalResources.size())+1);
+                        if(added)externalResources.push_back(resource);
+                        id=it->second;
+                    }
+                    externalBindings.push_back(std::to_string(id)+"u");
+                }
+            order.insert(order.end(),external.begin(),external.end());
+        }
+        auto& remap=slotRemaps[index];remap.resize(slots);
+        for(unsigned slot=0;slot<slots;++slot)remap[order[slot]]=slot;
+    }
     std::array<Lines, 8> shards;
     for (auto &shard : shards)
         shard = {"#include \"../GeneratedDefinitions.h\"", "#include \"../GeneratedDefinitionStorage.h\"", "",
@@ -416,7 +456,7 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
                 Lines fields;
                 for (unsigned i = 0; i < 8; ++i)
                     fields.push_back(i == 6 ? std::to_string(frame.cel) : CppFloat(frame.values[i]));
-                fields.push_back(std::to_string(frame.slot) + "u");
+                fields.push_back(std::to_string(slotRemaps[index].at(frame.slot)) + "u");
                 fields.push_back("nullptr");
                 fields.push_back(frame.hasText ? CppString(frame.text) : "nullptr");
                 values.push_back("{" + Join(fields, ", ") + "}");
@@ -438,10 +478,15 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         auto textures = emit("Sexy::GpuTexture*", "Textures", Lines(variants, "nullptr"));
         Lines rectValues;
         for (unsigned v = 0; v < variants; ++v)
-            for (auto &rect : atlas["variant_rectangles"][v])
-                rectValues.push_back(
-                    Region(DrawingRegion(rect, reports.at(path).at("variants").at(v)),
-                           atlas["variant_dimensions"][v][0], atlas["variant_dimensions"][v][1]));
+            for (unsigned slot=0;slot<slots;++slot) {
+                const auto originalSlot=slotOrders[index][slot];
+                const auto symbol=reports.at(path)["slot_sources"][v][originalSlot].get<std::string>();
+                auto rect=atlas["variant_rectangles"][v][originalSlot];
+                if(config.sharedImages.contains(symbol))
+                    rectValues.push_back(Region(rect,rect[2],rect[3]));
+                else rectValues.push_back(Region(DrawingRegion(rect,reports.at(path).at("variants").at(v)),
+                    atlas["variant_dimensions"][v][0],atlas["variant_dimensions"][v][1]));
+            }
         auto rects = emit("Sexy::TextureRegion", "Rects", rectValues, true);
         Lines transitionValues;
         for (auto &v : atlas["transitions"])
@@ -472,9 +517,10 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
              optionName = emit("std::uint32_t", "Options", integers(options));
         initializers.push_back(
             "{" +
-            Join({"{" + tracks + ", " + std::to_string(count) + "}", CppFloat(definition.fps), textures,
+            Join({"{" + tracks + ", " + std::to_string(count) + "}", CppFloat(definition.fps),
+                  std::to_string(externalBegins[index])+"u", textures,
                   std::to_string(variants) + "u", std::to_string(slots) + "u", std::to_string(actions) + "u",
-                  rects, transitions, startName, countName, optionName},
+                  std::to_string(externalOffsets[index])+"u", rects, transitions, startName, countName, optionName},
                  ", ") +
             "}");
         Lines segmentValues;
@@ -564,6 +610,10 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
                     "namespace GeneratedDefinitions {",
                     "inline constexpr int ReanimationCount=" + std::to_string(rc) +
                         ", ParticleCount=" + std::to_string(pc) + ";",
+                    "inline constexpr unsigned ExternalTextureCount="+std::to_string(externalResources.size())+"u;",
+                    "inline constexpr unsigned ExternalBindingCount="+std::to_string(externalBindings.size())+"u;",
+                    "extern Sexy::GpuTexture* ExternalTextures[ExternalTextureCount ? ExternalTextureCount : 1];",
+                    "extern const std::uint32_t ExternalTextureIds[ExternalBindingCount ? ExternalBindingCount : 1];",
                     "extern ReanimatorDefinition Reanimations[ReanimationCount];",
                     "extern TodParticleDefinition Particles[ParticleCount];",
                     "extern const char* const ParticlePaths[ParticleCount];",
@@ -585,6 +635,9 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
     storage.push_back("}");
     Lines objects = {"// Generated complete static definitions.", "#include \"GeneratedDefinitionStorage.h\"",
                      "namespace GeneratedDefinitions {",
+                     "constinit Sexy::GpuTexture* ExternalTextures[ExternalTextureCount ? ExternalTextureCount : 1]{};",
+                     "constinit const std::uint32_t ExternalTextureIds[ExternalBindingCount ? ExternalBindingCount : 1]={"+
+                         Join(externalBindings,",")+"};",
                      "constinit ReanimatorDefinition Reanimations[ReanimationCount] = {"};
     for (auto &row : initializers)
         objects.push_back("    " + row + ",");
@@ -634,7 +687,7 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
                   "#include \"GeneratedDefinitionStorage.h\"",
                   "#include \"Sexy.TodLib/DefinitionImageRegion.h\"",
                   "#include \"Sexy.TodLib/ParticleDefinitionCompiled.h\"",
-                  "#include \"Sexy.TodLib/TodCommon.h\"",
+                  "#include \"Sexy.TodLib/TodCommon.h\"", "#include \"Resources.h\"",
                   "#include <algorithm>",
                   "#include <stdexcept>",
                   "namespace GeneratedDefinitions {",
@@ -665,13 +718,19 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
         for (unsigned v = 0; v < rows.size(); ++v)
         {
             auto path = rows[v]["atlas_path"].get<std::string>();
-            if (path.empty())
-                continue;
-            atlasPaths.insert(path);
-            load.push_back(
-                "        DefinitionBindAtlasPath(Reanimations[" + std::to_string(index) + "].mTextures[" +
-                std::to_string(v) + "], " + std::to_string(rows[v]["atlas_width"].get<unsigned>()) + ", " +
-                std::to_string(rows[v]["atlas_height"].get<unsigned>()) + ", " + CppString(path) + ");");
+            if (!path.empty()) {
+                atlasPaths.insert(path);
+                load.push_back("        DefinitionBindAtlasPath(Reanimations["+std::to_string(index)+"].mTextures["+
+                    std::to_string(v)+"], "+
+                    std::to_string(rows[v]["atlas_width"].get<unsigned>())+", "+
+                    std::to_string(rows[v]["atlas_height"].get<unsigned>())+", "+CppString(path)+");");
+            }
+            for(unsigned slot=0;slot<report["slot_count"].get<unsigned>();++slot) {
+                const auto found=config.sharedImages.find(report["slot_sources"][v][slot].get<std::string>());
+                if(found!=config.sharedImages.end())
+                    load.push_back("        DefinitionBindImageResource(ExternalTextures["+
+                        std::to_string(externalIds.at(found->second)-1)+"], &Sexy::"+found->second+");");
+            }
         }
         load.push_back("        break;");
     }
@@ -699,9 +758,10 @@ Generated GenerateDefinitions(const Config &config, const Records &records, cons
     load.insert(load.end(), {"    projectileImages=true;", "}", "void LoadAllImages() {", "    BindFonts();",
                              "    for(int i=0;i<ReanimationCount;++i) LoadReanimationImages(i);",
                              "    LoadParticleImages();", "    LoadProjectileImages();", "}",
-                             "void ReleaseReanimationImages() {", "    for(auto& definition:Reanimations)",
-                             "        for(unsigned v=0;v<definition.mVariantCount;++v) "
-                             "DefinitionUnbindAtlas(definition.mTextures[v]);"});
+                             "void ReleaseReanimationImages() {", "    for(auto& definition:Reanimations) {",
+                             "        DefinitionUnbindAtlasRange(definition.mTextures,definition.mVariantCount);",
+                             "    }",
+                             "    DefinitionUnbindAtlasRange(ExternalTextures,ExternalTextureCount);"});
     for (auto &row : fontResets)
         load.push_back("    " + row);
     load.insert(load.end(),

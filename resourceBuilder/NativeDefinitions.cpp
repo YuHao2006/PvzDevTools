@@ -311,7 +311,7 @@ Definition ReanimVariants(const Bytes &source, const Json &metadata, const Json 
                 transitions.push_back(indices.at(targets[i].get<std::string>()));
         }
     }
-    Json dimensions = Json::array(), rectangles = Json::array();
+    Json dimensions = Json::array(), rectangles = Json::array(), slotSources=Json::array();
     for (unsigned v = 0; v < variants.size(); ++v)
     {
         const auto &row = variants[v];
@@ -319,17 +319,20 @@ Definition ReanimVariants(const Bytes &source, const Json &metadata, const Json 
         std::map<std::string, Json> regions;
         for (unsigned i = 0; i < row["symbols"].size(); ++i)
             regions[row["symbols"][i].get<std::string>()] = row["layout"]["regions"][i];
+        for(const auto& [symbol,image]:row["layout"].value("shared_images",Json::object()).items())
+            regions[symbol]={0,0,image["width"],image["height"]};
         bool hasImages = false;
         for (auto &track : images)
             for (auto &image : track)
                 hasImages |= !image.is_null();
         dimensions.push_back(hasImages ? Json{row["layout"]["width"], row["layout"]["height"]} : Json{0, 0});
-        Json rects = Json::array();
-        rects.push_back({0, 0, 0, 0});
+        Json rects = Json::array(), sources=Json::array();
+        rects.push_back({0, 0, 0, 0});sources.push_back("");
         for (unsigned i = 1; i < slots.size(); ++i)
         {
             const auto &[t, author, original, cell] = slots[i];
             const auto &replacement = images[t][author];
+            sources.push_back(replacement.is_null()?Json(""):replacement);
             if (replacement.is_null())
             {
                 rects.push_back({0, 0, 0, 0});
@@ -345,7 +348,7 @@ Definition ReanimVariants(const Bytes &source, const Json &metadata, const Json 
             }
             rects.push_back(r);
         }
-        rectangles.push_back(rects);
+        rectangles.push_back(rects);slotSources.push_back(sources);
     }
     Bytes payload;
     Word(payload, 0x37564152);
@@ -374,7 +377,7 @@ Definition ReanimVariants(const Bytes &source, const Json &metadata, const Json 
             {{"variant_count", variants.size()},
              {"slot_count", slots.size()},
              {"action_count", keys.size()},
-             {"variant_names", variantNames}}};
+             {"variant_names", variantNames}, {"slot_sources",slotSources}}};
 }
 
 Json ParseAtlas(const Bytes &bytes)

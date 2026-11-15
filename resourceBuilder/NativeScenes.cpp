@@ -206,6 +206,17 @@ Json PrepareScenes(Json documents, const Json &author, const Files &files,
         auto module = document["name"].get<std::string>(), path = ScenePath(module);
         Require(std::find(modules.begin(), modules.end(), module) != modules.end() && !result.contains(path),
                 "Duplicate scene module");
+        // Optional authoring: two complete, offline-baked dialog bodies.
+        // Builds that declare both labels share the resident UI atlas; other
+        // configurations keep their existing sources and geometry.
+        if (module == "CommonUI" && authored.contains("IMAGE_DIALOG_BAKED_NORMAL") &&
+            authored.contains("IMAGE_DIALOG_BAKED_TALL"))
+        {
+            document["sprites"].push_back({{"name", "DIALOG_BAKED_NORMAL"},
+                                            {"image", "IMAGE_DIALOG_BAKED_NORMAL"}, {"scale", 1.0}});
+            document["sprites"].push_back({{"name", "DIALOG_BAKED_TALL"},
+                                            {"image", "IMAGE_DIALOG_BAKED_TALL"}, {"scale", 1.0}});
+        }
         for (auto &row : document["sprites"])
         {
             auto image = row["image"].get<std::string>();
@@ -348,6 +359,17 @@ Records GenerateScenes(const Json &reports)
         }
         if(module=="CommonUI")
         {
+            std::map<std::string, Json> dialogs;
+            for (const auto &row : rows)
+                if (row["name"] == "DIALOG_BAKED_NORMAL" || row["name"] == "DIALOG_BAKED_TALL")
+                    dialogs[row["name"].get<std::string>()] = row["region"];
+            Require(dialogs.empty() || dialogs.size() == 2, "Incomplete baked dialog pair");
+            header += "inline constexpr bool HasBakedDialogs=" + std::string(dialogs.empty() ? "false" : "true") + ";\n";
+            header += "extern const Sexy::TextureRegion BakedDialogs[2];\n";
+            cpp += "const Sexy::TextureRegion BakedDialogs[2] = {\n";
+            for (const char *name : {"DIALOG_BAKED_NORMAL", "DIALOG_BAKED_TALL"})
+                cpp += "    " + Region(dialogs.empty() ? Json{0,0,0,0} : dialogs.at(name), width, height) + ",\n";
+            cpp += "};\n";
             std::map<unsigned,Json> cards;
             for(const auto &row:rows)
             {

@@ -36,6 +36,14 @@ inline constexpr std::uint32_t DAT64_V2_SCHEMA_ID = 0x00010732U;
 inline constexpr std::uint32_t DAT64_SCHEMA_ID = 0x00010745U;
 inline constexpr std::uint64_t DAT64_END_MARKER = 0xB4A9ABBEBBA5A9AFULL;
 
+// Older HD saves omitted these slots when the two stem textures were merged.
+constexpr int MissingHdStemTrack(std::uint32_t type, std::size_t savedTrackCount)
+{
+    if (type == 7 && savedTrackCount == 28) return 4;  // SunFlower
+    if (type == 27 && savedTrackCount == 15) return 6; // Marigold
+    return -1;
+}
+
 // Header bytes, all little-endian except the literal magic:
 //   00 char[8] magic = "PVZDAT64"
 //   08 u32 format version

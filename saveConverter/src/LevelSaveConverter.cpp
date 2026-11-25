@@ -2300,10 +2300,25 @@ std::vector<ReanimationSupplement> ReadReanimations(
             const auto aTrackBlock = theReader.SyncBytes(
                 static_cast<std::size_t>(aTrackCount) * aTrackSize,
                 "Reanimation.tracks");
-            aReanimation.mCanonicalTracks.reserve(aTrackCount);
+            const int aMissingTrack = HasReanimationVariants(theFormat)
+                ? LevelSaveFormat::MissingHdStemTrack(aReanimation.mDefinitionID, aTrackCount)
+                : -1;
+            aReanimation.mCanonicalTracks.reserve(aTrackCount + (aMissingTrack >= 0));
             aReanimation.mImageResourceIDs.reserve(aTrackCount);
             for (int track = 0; track < aTrackCount; ++track)
             {
+                if (track == aMissingTrack)
+                {
+                    // Default ReanimatorTrackInstance for the retired stem.
+                    std::vector<Byte> aStem(aTrackLayout.mDat64Size, 0);
+                    for (std::size_t offset = 8; offset < 40; offset += 4)
+                        WriteU32At(aStem, offset, std::bit_cast<std::uint32_t>(-10000.0f));
+                    for (std::size_t offset = 92; offset < 108; offset += 4)
+                        WriteU32At(aStem, offset, 255);
+                    aStem[109] = 1; // mTruncateDisappearingFrames
+                    aReanimation.mCanonicalTracks.push_back(std::move(aStem));
+                    theReader.mNanoseconds.insert(theReader.mNanoseconds.end(), trackFields.size(), 0);
+                }
                 auto bytes = ReadTimeRecord(theReader,
                     aTrackBlock.subspan(static_cast<std::size_t>(track) * aTrackSize, aTrackSize),
                     trackFields, theFormat);
